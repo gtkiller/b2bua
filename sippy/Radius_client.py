@@ -37,13 +37,15 @@ class Radius_client(External_command):
 
     def __init__(self, global_config = {}):
         self.global_config = global_config
-        command = global_config.get('radiusclient', '/usr/local/sbin/radiusclient')
-        config = global_config.get('radiusclient.conf', None)
+        command = global_config.get('radiusclient')
+        config = global_config.get('radiusclient.conf')
         max_workers = global_config.get('max_radiusclients', 20)
-        if config != None:
-            External_command.__init__(self, (command, '-f', config, '-s'), max_workers = max_workers)
-        else:
-            External_command.__init__(self, (command, '-s'), max_workers = max_workers)
+        cmd = [command] if command else ['/usr/bin/env', 'radiusclient']
+        if config:
+            cmd.append('-f')
+            cmd.append(config)
+        cmd.append('-s')
+        External_command.__init__(self, cmd, max_workers = max_workers)
 
     def _prepare_attributes(self, type, attributes):
         data = [type]
