@@ -730,7 +730,7 @@ if __name__ == '__main__':
         fd = os.open('/dev/null', os.O_RDONLY)
         os.dup2(fd, sys.__stdin__.fileno())
         os.close(fd)
-        fd = os.open(logfile, os.O_WRONLY | os.O_CREAT | os.O_APPEND)
+        fd = os.open(logfile, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0644)
         os.dup2(fd, sys.__stdout__.fileno())
         os.dup2(fd, sys.__stderr__.fileno())
         os.close(fd)
