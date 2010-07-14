@@ -42,6 +42,8 @@ from sippy.RadiusAuthorisation import RadiusAuthorisation
 from sippy.RadiusAccounting import RadiusAccounting
 from sippy.FakeAccounting import FakeAccounting
 from sippy.SipLogger import SipLogger
+from sippy.MsgBody import MsgBody
+from sippy.SipCallId import SipCallId
 from sippy.Rtp_proxy_session import Rtp_proxy_session
 from signal import SIGHUP, SIGPROF, SIGUSR1, SIGUSR2
 from twisted.internet import reactor
@@ -77,6 +79,8 @@ class CCStateIdle(object):
     sname = 'Idle'
 class CCStateWaitRoute(object):
     sname = 'WaitRoute'
+class CCStateWaitLeftRoute(object):
+    sname = 'WaitLeftRoute'
 class CCStateARComplete(object):
     sname = 'ARComplete'
 class CCStateConnected(object):
@@ -134,7 +138,7 @@ class CallController(object):
                     self.uaA.recvEvent(CCEventFail((500, 'Internal Server Error (1)'), rtime = event.rtime))
                     self.state = CCStateDead
                     return
-                if body == None:
+                if not body:
                     self.uaA.recvEvent(CCEventFail((500, 'Body-less INVITE is not supported'), rtime = event.rtime))
                     self.state = CCStateDead
                     return
@@ -185,7 +189,7 @@ class CallController(object):
             self.uaO.recvEvent(event)
         else:
             if (isinstance(event, CCEventFail) or isinstance(event, CCEventDisconnect)) and self.state == CCStateARComplete and \
-              (isinstance(self.uaA.state, UasStateTrying) or isinstance(self.uaA.state, UasStateRinging)) and len(self.routes) > 0:
+              (isinstance(self.uaA.state, UasStateTrying) or isinstance(self.uaA.state, UasStateRinging)) and self.routes:
                 if isinstance(event, CCEventFail):
                     code = event.getData()[0]
                 else:
@@ -214,27 +218,27 @@ class CallController(object):
         else:
             self.acctA = FakeAccounting()
         # Check that uaA is still in a valid state, send acct stop
-        if not isinstance(self.uaA.state, UasStateTrying):
+        if not self.state == CCStateWaitLeftRoute and not isinstance(self.uaA.state, UasStateTrying):
             self.acctA.disc(self.uaA, time(), 'caller')
             return
         cli = [x[1][4:] for x in results[0] if x[0] == 'h323-ivr-in' and x[1].startswith('CLI:')]
-        if len(cli) > 0:
+        if cli:
             self.cli = cli[0]
-            if len(self.cli) == 0:
+            if not self.cli:
                 self.cli = None
         caller_name = [x[1][5:] for x in results[0] if x[0] == 'h323-ivr-in' and x[1].startswith('CNAM:')]
-        if len(caller_name) > 0:
+        if caller_name:
             self.caller_name = caller_name[0]
-            if len(self.caller_name) == 0:
+            if not self.caller_name:
                 self.caller_name = None
         credit_time = [x for x in results[0] if x[0] == 'h323-credit-time']
-        if len(credit_time) > 0:
+        if credit_time:
             global_credit_time = int(credit_time[0][1])
         else:
             global_credit_time = None
         if not self.global_config.has_key('static_route'):
             routing = [x for x in results[0] if x[0] == 'h323-ivr-in' and x[1].startswith('Routing:')]
-            if len(routing) == 0:
+            if not routing:
                 self.uaA.recvEvent(CCEventFail((500, 'Internal Server Error (2)')))
                 self.state = CCStateDead
                 return
@@ -246,7 +250,7 @@ class CallController(object):
             rnum += 1
             if route[0].find('@') != -1:
                 cld, host = route[0].split('@')
-                if len(cld) == 0:
+                if not cld:
                     # Allow CLD to be forcefully removed by sending `Routing:@host' entry,
                     # as opposed to the Routing:host, which means that CLD should be obtained
                     # from the incoming call leg.
@@ -284,11 +288,11 @@ class CallController(object):
                     user, passw = v.split(':', 1)
                 elif a == 'cli':
                     cli = v
-                    if len(cli) == 0:
+                    if not cli:
                         cli = None
                 elif a == 'cnam':
                     caller_name = unquote(v)
-                    if len(caller_name) == 0:
+                    if not caller_name:
                         caller_name = None
                     parameters['caller_name'] = caller_name
                 elif a == 'ash':
@@ -309,7 +313,7 @@ class CallController(object):
             self.routes.append((rnum, host, cld, credit_time, expires, no_progress_expires, forward_on_fail, user, \
               passw, cli, parameters))
             #print 'Got route:', host, cld
-        if len(self.routes) == 0:
+        if not self.routes:
             self.uaA.recvEvent(CCEventFail((500, 'Internal Server Error (3)')))
             self.state = CCStateDead
             return
@@ -364,7 +368,7 @@ class CallController(object):
         self.uaA.disconnect(rtime = rtime)
 
     def oConn(self, ua, rtime, origin):
-        if self.acctO != None:
+        if self.acctO:
             self.acctO.conn(ua, rtime, origin)
 
     def aConn(self, ua, rtime, origin):
@@ -415,6 +419,41 @@ class CallController(object):
         while self.routes[0][0] != skipto:
             self.routes.pop(0)
         self.uaO.disconnect()
+
+    def makeCall(self, fr, to):
+        self.cGUID = SipCiscoGUID()
+        self.cli = to 
+        self.cld = fr
+
+#TODO: move to a subroutine()
+        t = str(time())
+        a = global_config['sip_address'] 
+        content = \
+        "v=0\r\n" \
+        "o=- " + t + " " + t + " IN IP4 " + a + "\r\n" \
+        "s=b2bua\r\n" \
+        "c=IN IP4 " + a + "\r\n" \
+        "t=0 0\r\n" \
+        "a=sendrecv\r\n" \
+        "m=audio 35000 RTP/AVP 0 8 101\r\n" \
+        "a=rtpmap:0 PCMU/8000\r\n" \
+        "a=rtpmap:8 PCMA/8000\r\n" \
+        "a=rtpmap:101 telephone-event/8000\r\n" 
+
+        body = MsgBody(content)
+#TODO end
+        self.cId = SipCallId()
+        self.caller_name = self.cli
+        auth = None
+        ev = CCEventTry((self.cId, self.cGUID, self.cli, self.cld, body, auth, self.cli), origin = self.cld)
+        self.eTry = ev
+        self.state = CCStateWaitLeftRoute
+        self.username = self.remote_ip
+        if self.global_config['auth_enable']:
+            self.auth_proc = self.global_config['radius_client'].do_auth(self.remote_ip, self.cli, self.cld, self.cGUID, \
+                self.cId, self.remote_ip, self.rDone)
+        else:
+            self.rDone(((), 0))
 
 class CallMap(object):
     ccmap = None
@@ -467,7 +506,7 @@ class CallMap(object):
                    challenge.getBody().realm = req.getRURI().host
                # Send challenge immediately if digest is the
                # only method of authenticating
-               if challenge != None and False:
+               if challenge and False: #TODO: typo?
                    resp = req.genResponse(401, 'Unauthorized')
                    resp.appendHeader(challenge)
                    return (resp, None, None)
@@ -528,6 +567,12 @@ class CallMap(object):
         #print gc.collect()
         if len(gc.garbage) > 0:
             print gc.garbage
+
+    def makeCall(self, fr, to):
+        source = remote_ip = global_config['sip_address']
+        cc = CallController(remote_ip, source, self.global_config, pass_headers = [])
+        self.ccmap.append(cc)
+        cc.makeCall(fr, to)
 
     def recvCommand(self, clim, cmd):
         prompt = 'b2bua $ '
@@ -605,6 +650,7 @@ class CallMap(object):
             if len(args) != 2:
                 clim.send('ERROR: syntax error:\n' + help + prompt)
                 return False
+            self.makeCall(args[0], args[1])
             clim.send('Not implemented\n' + prompt)
             return False
         clim.send('ERROR: unknown command\n' + prompt)
@@ -764,6 +810,7 @@ if __name__ == '__main__':
         SipConf.my_port = lport
     global_config['sip_logger'] = SipLogger('b2bua')
     global_config['sip_address'] = SipConf.my_address
+    print global_config 
     global_config['sip_port'] = SipConf.my_port
 
     if len(rtp_proxy_clients) > 0:
