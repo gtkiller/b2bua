@@ -531,17 +531,18 @@ class CallMap(object):
 
     def recvCommand(self, clim, cmd):
         prompt = 'b2bua $ '
+        help = 'h             this help message\n' \
+               'q             close the command socket\n' \
+               'l             list in-memory calls\n' \
+               'd <callid>    drop the call identified by <callid>\n' \
+               'r <id>        drop the call identified by <id>\n' \
+               'c <from> <to> make a call from <from> to <to>\n'
         if not cmd:
             clim.send(prompt)
             return False
         args = cmd.split()
         cmd = args.pop(0).lower()
         if cmd == 'h':
-            help = 'h            this help message\n' \
-                   'q            close the command socket\n' \
-                   'l            list in-memory calls\n' \
-                   'd <callid>   drop call\n' \
-                   'r [id]       drop call\n'
             clim.send(help + prompt)
             return False
         if cmd == 'q':
@@ -569,7 +570,7 @@ class CallMap(object):
             return False
         if cmd == 'd':
             if len(args) != 1:
-                clim.send('ERROR: syntax error: d <call-id>\n' + prompt)
+                clim.send('ERROR: syntax error:\n' + help + prompt)
                 return False
             if args[0] == '*':
                 self.discAll()
@@ -585,7 +586,7 @@ class CallMap(object):
             return False
         if cmd == 'r':
             if len(args) != 1:
-                clim.send('ERROR: syntax error: r [id]\n' + prompt)
+                clim.send('ERROR: syntax error:\n' + help + prompt)
                 return False
             idx = int(args[0])
             dlist = [x for x in self.ccmap if x.id == idx]
@@ -596,6 +597,12 @@ class CallMap(object):
                 if cc.state == CCStateConnected and cc.proxied:
                     cc.disconnect(time() - 60)
             clim.send('OK\n' + prompt)
+            return False
+        if cmd == 'c':
+            if len(args) != 2:
+                clim.send('ERROR: syntax error:\n' + help + prompt)
+                return False
+            clim.send('Not implemented\n' + prompt)
             return False
         clim.send('ERROR: unknown command\n' + prompt)
         return False
