@@ -535,7 +535,7 @@ class CallMap(object):
                'q             close the command socket\n' \
                'l             list in-memory calls\n' \
                'd <callid>    drop the call identified by <callid>\n' \
-               'r <id>        drop the call identified by <id>\n' \
+               'r <id>        drop the call identified by <id>. <id> is an integer index of the call\n' \
                'c <from> <to> make a call from <from> to <to>\n'
         if not cmd:
             clim.send(prompt)
@@ -553,12 +553,12 @@ class CallMap(object):
             total = 0
             for cc in self.ccmap:
                 res += '%s: %s (' % (cc.cId, cc.state.sname)
-                if cc.uaA != None:
+                if cc.uaA:
                     res += '%s %s:%d %s %s -> ' % (cc.uaA.state, cc.uaA.getRAddr0()[0], \
                       cc.uaA.getRAddr0()[1], cc.uaA.getCLD(), cc.uaA.getCLI())
                 else:
                     res += 'N/A -> '
-                if cc.uaO != None:
+                if cc.uaO:
                     res += '%s %s:%d %s %s)\n' % (cc.uaO.state, cc.uaO.getRAddr0()[0], \
                       cc.uaO.getRAddr0()[1], cc.uaO.getCLI(), cc.uaO.getCLD())
                 else:
@@ -578,7 +578,7 @@ class CallMap(object):
                 return False
             dlist = [x for x in self.ccmap if str(x.cId) == args[0]]
             if not dlist:
-                clim.send('ERROR: no call with id of %s has been found\n' + prompt % args[0])
+                clim.send('ERROR: no call with id of "' + args[0] + '" has been found\n' + prompt)
                 return False
             for cc in dlist:
                 cc.disconnect()
@@ -588,10 +588,13 @@ class CallMap(object):
             if len(args) != 1:
                 clim.send('ERROR: syntax error:\n' + help + prompt)
                 return False
+            if not args[0].isdigit():
+                clim.send('ERROR: invalid argument:\n' + help + prompt)
+                return False
             idx = int(args[0])
             dlist = [x for x in self.ccmap if x.id == idx]
             if not dlist:
-                clim.send('ERROR: no call with id of %d has been found\n' + prompt % idx)
+                clim.send('ERROR: no call with id of "' + str(idx) + '" has been found\n' + prompt)
                 return False
             for cc in dlist:
                 if cc.state == CCStateConnected and cc.proxied:
