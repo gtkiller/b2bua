@@ -552,7 +552,7 @@ class CallMap(object):
             res = 'In-memory calls:\n'
             total = 0
             for cc in self.ccmap:
-                res += '%s: %s (' % (cc.cId, cc.state.sname)
+                res += '%d: %s: %s (' % (cc.id, cc.cId, cc.state.sname)
                 if cc.uaA:
                     res += '%s %s:%d %s %s -> ' % (cc.uaA.state, cc.uaA.getRAddr0()[0], \
                       cc.uaA.getRAddr0()[1], cc.uaA.getCLD(), cc.uaA.getCLI())
