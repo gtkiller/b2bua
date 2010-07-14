@@ -171,7 +171,7 @@ class CallController(object):
                 if not self.global_config['auth_enable']:
                     self.username = self.remote_ip
                     self.rDone(((), 0))
-                elif auth == None or auth.username == None or len(auth.username) == 0:
+                elif not auth or not auth.username:
                     self.username = self.remote_ip
                     self.auth_proc = self.global_config['radius_client'].do_auth(self.remote_ip, self.cli, self.cld, self.cGUID, \
                       self.cId, self.remote_ip, self.rDone)
@@ -180,7 +180,7 @@ class CallController(object):
                     self.auth_proc = self.global_config['radius_client'].do_auth(auth.username, self.cli, self.cld, self.cGUID, 
                       self.cId, self.remote_ip, self.rDone, auth.realm, auth.nonce, auth.uri, auth.response)
                 return
-            if self.state not in (CCStateARComplete, CCStateConnected, CCStateDisconnecting) or self.uaO == None:
+            if self.state not in (CCStateARComplete, CCStateConnected, CCStateDisconnecting) or not self.uaO:
                 return
             self.uaO.recvEvent(event)
         else:
@@ -190,7 +190,7 @@ class CallController(object):
                     code = event.getData()[0]
                 else:
                     code = None
-                if code == None or code not in self.huntstop_scodes:
+                if not code or code not in self.huntstop_scodes:
                     self.placeOriginate(self.routes.pop(0))
                     return
             self.uaA.recvEvent(event)
