@@ -530,6 +530,10 @@ class CallMap(object):
             print gc.garbage
 
     def recvCommand(self, clim, cmd):
+        prompt = 'b2bua $ '
+        if not cmd:
+            clim.send(prompt)
+            return False
         args = cmd.split()
         cmd = args.pop(0).lower()
         if cmd == 'q':
@@ -552,39 +556,40 @@ class CallMap(object):
                     res += 'N/A)\n'
                 total += 1
             res += 'Total: %d\n' % total
+            res += prompt
             clim.send(res)
             return False
         if cmd == 'd':
             if len(args) != 1:
-                clim.send('ERROR: syntax error: d <call-id>\n')
+                clim.send('ERROR: syntax error: d <call-id>\n' + prompt)
                 return False
             if args[0] == '*':
                 self.discAll()
-                clim.send('OK\n')
+                clim.send('OK\n' + prompt)
                 return False
             dlist = [x for x in self.ccmap if str(x.cId) == args[0]]
             if len(dlist) == 0:
-                clim.send('ERROR: no call with id of %s has been found\n' % args[0])
+                clim.send('ERROR: no call with id of %s has been found\n' + prompt % args[0])
                 return False
             for cc in dlist:
                 cc.disconnect()
-            clim.send('OK\n')
+            clim.send('OK\n' + prompt)
             return False
         if cmd == 'r':
             if len(args) != 1:
-                clim.send('ERROR: syntax error: r [<id>]\n')
+                clim.send('ERROR: syntax error: r [<id>]\n' + prompt)
                 return False
             idx = int(args[0])
             dlist = [x for x in self.ccmap if x.id == idx]
             if len(dlist) == 0:
-                clim.send('ERROR: no call with id of %d has been found\n' % idx)
+                clim.send('ERROR: no call with id of %d has been found\n' + prompt % idx)
                 return False
             for cc in dlist:
                 if cc.state == CCStateConnected and cc.proxied:
                     cc.disconnect(time() - 60)
-            clim.send('OK\n')
+            clim.send('OK\n' + prompt)
             return False
-        clim.send('ERROR: unknown command\n')
+        clim.send('ERROR: unknown command\n' + prompt)
         return False
 
 def reopen(signum, logfile):

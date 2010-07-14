@@ -37,10 +37,17 @@ class Cli_session(Protocol):
         self.rbuffer = ''
         self.wbuffer = ''
 
-    #def connectionMade(self):
+    def connectionMade(self):
     #    print self.transport.getPeer()
     #    self.transport.loseConnection()
-
+        try:
+            self.cb_busy = self.command_cb(self, '')
+        except:
+            print 'Cli_session: unhandled exception when processing incoming data'
+            print '-' * 70
+            traceback.print_exc(file = sys.stdout)
+            print '-' * 70
+ 
     def dataReceived(self, data):
         if len(data) == 0:
             return
@@ -53,14 +60,13 @@ class Cli_session(Protocol):
                 return
             cmd, self.rbuffer = self.rbuffer.split('\n', 1)
             cmd = cmd.strip()
-            if len(cmd) > 0:
-                try:
-                    self.cb_busy = self.command_cb(self, cmd)
-                except:
-                    print 'Cli_session: unhandled exception when processing incoming data'
-                    print '-' * 70
-                    traceback.print_exc(file = sys.stdout)
-                    print '-' * 70
+            try:
+                self.cb_busy = self.command_cb(self, cmd)
+            except:
+                print 'Cli_session: unhandled exception when processing incoming data'
+                print '-' * 70
+                traceback.print_exc(file = sys.stdout)
+                print '-' * 70
 
     def done(self):
         self.cb_busy = False
