@@ -576,7 +576,7 @@ class CallMap(object):
                 clim.send('OK\n' + prompt)
                 return False
             dlist = [x for x in self.ccmap if str(x.cId) == args[0]]
-            if len(dlist) == 0:
+            if not dlist:
                 clim.send('ERROR: no call with id of %s has been found\n' + prompt % args[0])
                 return False
             for cc in dlist:
@@ -589,7 +589,7 @@ class CallMap(object):
                 return False
             idx = int(args[0])
             dlist = [x for x in self.ccmap if x.id == idx]
-            if len(dlist) == 0:
+            if not dlist:
                 clim.send('ERROR: no call with id of %d has been found\n' + prompt % idx)
                 return False
             for cc in dlist:
