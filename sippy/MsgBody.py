@@ -36,7 +36,7 @@ class MsgBody(object):
     parsed = False
 
     def __init__(self, content = None, mtype = 'application/sdp', cself = None):
-        if content != None:
+        if content:
             self.mtype = mtype
             self.content = content
         else:

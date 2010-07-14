@@ -55,7 +55,7 @@ class SdpBody(object):
     sections = None
 
     def __init__(self, body = None, cself = None):
-        if cself != None:
+        if cself:
             for header_name in [x + '_header' for x in self.all_headers]:
                 try:
                     setattr(self, header_name, getattr(cself, header_name).getCopy())
@@ -66,7 +66,7 @@ class SdpBody(object):
             return
         self.a_headers = []
         self.sections = []
-        if body == None:
+        if not body:
             return
         avpairs = [x.split('=', 1) for x in body.strip().splitlines()]
         current_snum = 0
@@ -85,16 +85,16 @@ class SdpBody(object):
                     setattr(self, name + '_header', f_types[name](v))
             else:
                 self.sections[-1].addHeader(name, v)
-        if c_header != None:
+        if c_header:
             for section in self.sections:
-                if section.c_header == None:
+                if not section.c_header:
                     section.addHeader('c', c_header)
-            if len(self.sections) == 0:
+            if not self.sections:
                 self.addHeader('c', c_header)
 
     def __str__(self):
         s = ''
-        if len(self.sections) == 1 and self.sections[0].c_header != None:
+        if len(self.sections) == 1 and self.sections[0].c_header:
             for name in self.first_half:
                 header = getattr(self, name + '_header')
                 if header != None:
@@ -119,7 +119,7 @@ class SdpBody(object):
         return s
 
     def __iadd__(self, other):
-        if len(self.sections) > 0:
+        if self.sections:
             self.sections[-1].addHeader(*other.strip().split('=', 1))
         else:
             self.addHeader(*other.strip().split('=', 1))
