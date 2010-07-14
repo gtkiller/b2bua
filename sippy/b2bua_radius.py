@@ -536,6 +536,14 @@ class CallMap(object):
             return False
         args = cmd.split()
         cmd = args.pop(0).lower()
+        if cmd == 'h':
+            help = 'h            this help message\n' \
+                   'q            close the command socket\n' \
+                   'l            list in-memory calls\n' \
+                   'd <callid>   drop call\n' \
+                   'r [id]       drop call\n'
+            clim.send(help + prompt)
+            return False
         if cmd == 'q':
             clim.close()
             return False
@@ -577,7 +585,7 @@ class CallMap(object):
             return False
         if cmd == 'r':
             if len(args) != 1:
-                clim.send('ERROR: syntax error: r [<id>]\n' + prompt)
+                clim.send('ERROR: syntax error: r [id]\n' + prompt)
                 return False
             idx = int(args[0])
             dlist = [x for x in self.ccmap if x.id == idx]
