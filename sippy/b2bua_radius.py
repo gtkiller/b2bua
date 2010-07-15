@@ -50,7 +50,7 @@ from twisted.internet import reactor
 from urllib import unquote
 from sippy.Cli_server_local import Cli_server_local
 from sippy.SipTransactionManager import SipTransactionManager
-import gc, getopt, os, sys
+import gc, getopt, os, sys, traceback
 from re import sub
 from time import time
 from urllib import quote
@@ -575,85 +575,91 @@ class CallMap(object):
         cc.makeCall(fr, to)
 
     def recvCommand(self, clim, cmd):
-        prompt = 'b2bua $ '
-        help = 'h             this help message\n' \
-               'q             close the command socket\n' \
-               'l             list in-memory calls\n' \
-               'd <callid>    drop the call identified by <callid>\n' \
-               'r <id>        drop the call identified by <id>. <id> is an integer index of the call\n' \
-               'c <from> <to> make a call from <from> to <to>\n'
-        if not cmd:
-            clim.send(prompt)
-            return False
-        args = cmd.split()
-        cmd = args.pop(0).lower()
-        if cmd == 'h':
-            clim.send(help + prompt)
-            return False
-        if cmd == 'q':
-            clim.close()
-            return False
-        if cmd == 'l':
-            res = 'In-memory calls:\n'
-            total = 0
-            for cc in self.ccmap:
-                res += '%d: %s: %s (' % (cc.id, cc.cId, cc.state.sname)
-                if cc.uaA:
-                    res += '%s %s:%d %s %s -> ' % (cc.uaA.state, cc.uaA.getRAddr0()[0], \
-                      cc.uaA.getRAddr0()[1], cc.uaA.getCLD(), cc.uaA.getCLI())
-                else:
-                    res += 'N/A -> '
-                if cc.uaO:
-                    res += '%s %s:%d %s %s)\n' % (cc.uaO.state, cc.uaO.getRAddr0()[0], \
-                      cc.uaO.getRAddr0()[1], cc.uaO.getCLI(), cc.uaO.getCLD())
-                else:
-                    res += 'N/A)\n'
-                total += 1
-            res += 'Total: %d\n' % total
-            res += prompt
-            clim.send(res)
-            return False
-        if cmd == 'd':
-            if len(args) != 1:
-                clim.send('ERROR: syntax error:\n' + help + prompt)
+        try:
+            prompt = 'b2bua $ '
+            help = 'h             this help message\n' \
+                   'q             close the command socket\n' \
+                   'l             list in-memory calls\n' \
+                   'd <callid>    drop the call identified by <callid>\n' \
+                   'r <id>        drop the call identified by <id>. <id> is an integer index of the call\n' \
+                   'c <from> <to> make a call from <from> to <to>\n'
+            if not cmd:
+                clim.send(prompt)
                 return False
-            if args[0] == '*':
-                self.discAll()
+            args = cmd.split()
+            cmd = args.pop(0).lower()
+            if cmd == 'h':
+                clim.send(help + prompt)
+                return False
+            if cmd == 'q':
+                clim.close()
+                return False
+            if cmd == 'l':
+                res = 'In-memory calls:\n'
+                total = 0
+                for cc in self.ccmap:
+                    res += '%d: %s: %s (' % (cc.id, cc.cId, cc.state.sname)
+                    if cc.uaA:
+                        res += '%s %s:%d %s %s -> ' % (cc.uaA.state, cc.uaA.getRAddr0()[0], \
+                          cc.uaA.getRAddr0()[1], cc.uaA.getCLD(), cc.uaA.getCLI())
+                    else:
+                        res += 'N/A -> '
+                    if cc.uaO:
+                        res += '%s %s:%d %s %s)\n' % (cc.uaO.state, cc.uaO.getRAddr0()[0], \
+                          cc.uaO.getRAddr0()[1], cc.uaO.getCLI(), cc.uaO.getCLD())
+                    else:
+                        res += 'N/A)\n'
+                    total += 1
+                res += 'Total: %d\n' % total
+                res += prompt
+                clim.send(res)
+                return False
+            if cmd == 'd':
+                if len(args) != 1:
+                    clim.send('ERROR: syntax error:\n' + help + prompt)
+                    return False
+                if args[0] == '*':
+                    self.discAll()
+                    clim.send('OK\n' + prompt)
+                    return False
+                dlist = [x for x in self.ccmap if str(x.cId) == args[0]]
+                if not dlist:
+                    clim.send('ERROR: no call with id of "' + args[0] + '" has been found\n' + prompt)
+                    return False
+                for cc in dlist:
+                    cc.disconnect()
                 clim.send('OK\n' + prompt)
                 return False
-            dlist = [x for x in self.ccmap if str(x.cId) == args[0]]
-            if not dlist:
-                clim.send('ERROR: no call with id of "' + args[0] + '" has been found\n' + prompt)
+            if cmd == 'r':
+                if len(args) != 1:
+                    clim.send('ERROR: syntax error:\n' + help + prompt)
+                    return False
+                if not args[0].isdigit():
+                    clim.send('ERROR: invalid argument:\n' + help + prompt)
+                    return False
+                idx = int(args[0])
+                dlist = [x for x in self.ccmap if x.id == idx]
+                if not dlist:
+                    clim.send('ERROR: no call with id of "' + str(idx) + '" has been found\n' + prompt)
+                    return False
+                for cc in dlist:
+                    if cc.state == CCStateConnected and cc.proxied:
+                        cc.disconnect(time() - 60)
+                clim.send('OK\n' + prompt)
                 return False
-            for cc in dlist:
-                cc.disconnect()
-            clim.send('OK\n' + prompt)
-            return False
-        if cmd == 'r':
-            if len(args) != 1:
-                clim.send('ERROR: syntax error:\n' + help + prompt)
+            if cmd == 'c':
+                if len(args) != 2:
+                    clim.send('ERROR: syntax error:\n' + help + prompt)
+                    return False
+                self.makeCall(args[0], args[1])
+                clim.send('Not implemented\n' + prompt)
                 return False
-            if not args[0].isdigit():
-                clim.send('ERROR: invalid argument:\n' + help + prompt)
-                return False
-            idx = int(args[0])
-            dlist = [x for x in self.ccmap if x.id == idx]
-            if not dlist:
-                clim.send('ERROR: no call with id of "' + str(idx) + '" has been found\n' + prompt)
-                return False
-            for cc in dlist:
-                if cc.state == CCStateConnected and cc.proxied:
-                    cc.disconnect(time() - 60)
-            clim.send('OK\n' + prompt)
-            return False
-        if cmd == 'c':
-            if len(args) != 2:
-                clim.send('ERROR: syntax error:\n' + help + prompt)
-                return False
-            self.makeCall(args[0], args[1])
-            clim.send('Not implemented\n' + prompt)
-            return False
-        clim.send('ERROR: unknown command\n' + prompt)
+            clim.send('ERROR: unknown command\n' + prompt)
+        except:
+            print '-' * 70
+            traceback.print_exc(file = sys.stdout)
+            print '-' * 70
+            clim.send('ERROR: internal server error\n' + prompt)
         return False
 
 def reopen(signum, logfile):
