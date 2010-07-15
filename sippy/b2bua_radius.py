@@ -79,8 +79,8 @@ class CCStateIdle(object):
     sname = 'Idle'
 class CCStateWaitRoute(object):
     sname = 'WaitRoute'
-class CCStateWaitLeftRoute(object):
-    sname = 'WaitLeftRoute'
+class CCStateWaitARoute(object):
+    sname = 'WaitARoute'
 class CCStateARComplete(object):
     sname = 'ARComplete'
 class CCStateConnected(object):
@@ -218,7 +218,7 @@ class CallController(object):
         else:
             self.acctA = FakeAccounting()
         # Check that uaA is still in a valid state, send acct stop
-        if not self.state == CCStateWaitLeftRoute and not isinstance(self.uaA.state, UasStateTrying):
+        if not self.state == CCStateWaitARoute and not isinstance(self.uaA.state, UasStateTrying):
             self.acctA.disc(self.uaA, time(), 'caller')
             return
         cli = [x[1][4:] for x in results[0] if x[0] == 'h323-ivr-in' and x[1].startswith('CLI:')]
@@ -447,7 +447,7 @@ class CallController(object):
         auth = None
         ev = CCEventTry((self.cId, self.cGUID, self.cli, self.cld, body, auth, self.cli), origin = self.cld)
         self.eTry = ev
-        self.state = CCStateWaitLeftRoute
+        self.state = CCStateWaitARoute
         self.username = self.remote_ip
         if self.global_config['auth_enable']:
             self.auth_proc = self.global_config['radius_client'].do_auth(self.remote_ip, self.cli, self.cld, self.cGUID, \
