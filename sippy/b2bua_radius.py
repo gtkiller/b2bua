@@ -368,8 +368,48 @@ class CallController(object):
         self.uaA.disconnect(rtime = rtime)
 
     def oConn(self, ua, rtime, origin):
-        if self.acctO:
-            self.acctO.conn(ua, rtime, origin)
+        if self.uaA.state:
+            # Regular call.
+            if self.acctO:
+                self.acctO.conn(ua, rtime, origin)
+        else:
+            # Command 'make call'.
+            self.uaA = self.uaO
+            self.uaO = None
+
+            tmp = self.cli
+            self.cli = self.cld
+            self.cld = tmp
+
+    #TODO: correct sdp body of uaA
+            t = str(time())
+            a = global_config['sip_address'] 
+            content = \
+            "v=0\r\n" \
+            "o=- 1 2 IN IP4 " + a + "\r\n" \
+            "s=b2bua\r\n" \
+            "c=IN IP4 " + a + "\r\n" \
+            "t=0 0\r\n" \
+            "a=sendrecv\r\n" \
+            "m=audio 35000 RTP/AVP 0 8 101\r\n" \
+            "a=rtpmap:0 PCMU/8000\r\n" \
+            "a=rtpmap:8 PCMA/8000\r\n" \
+            "a=rtpmap:101 telephone-event/8000\r\n" 
+
+            body = MsgBody(content)
+    #TODO end
+            self.cId = SipCallId()
+            self.caller_name = self.cli
+            auth = None
+            ev = CCEventTry((self.cId, self.cGUID, self.cli, self.cld, body, auth, self.cli), origin = self.cld)
+            self.eTry = ev
+            self.state = CCStateWaitARoute
+            self.username = self.remote_ip
+            if self.global_config['auth_enable']:
+                self.auth_proc = self.global_config['radius_client'].do_auth(self.remote_ip, self.cli, self.cld, self.cGUID, \
+                    self.cId, self.remote_ip, self.rDone)
+            else:
+                self.rDone(((), 0))
 
     def aConn(self, ua, rtime, origin):
         self.state = CCStateConnected
