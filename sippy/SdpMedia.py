@@ -31,14 +31,14 @@ class MTOther(object):
     pass
 
 class SdpMedia(object):
-    type = None
-    stype = None
-    port = None
-    transport = None
-    formats = None
+    type = MTAudio
+    stype = 'audio'
+    port = 35000
+    transport = 'RTP/AVP'
+    formats = [0, 8, 101]
 
     def __init__(self, body = None, cself = None):
-        if body != None:
+        if body:
             params = body.split()
             self.stype = params[0]
             if self.stype.lower() == 'audio':
@@ -51,7 +51,7 @@ class SdpMedia(object):
                 self.formats = [int(x) for x in params[3:]]
             else:
                 self.formats = params[3:]
-        else:
+        elif cself:
             self.type = cself.type
             self.stype = cself.stype
             self.port = cself.port
@@ -70,3 +70,4 @@ class SdpMedia(object):
 
     def getCopy(self):
         return SdpMedia(cself = self)
+

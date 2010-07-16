@@ -24,15 +24,17 @@
 #
 # $Id: SdpConnecton.py,v 1.4 2009/01/05 20:14:00 sobomax Exp $
 
+from SipConf import SipConf
+
 class SdpConnecton(object):
-    ntype = None
-    atype = None
-    addr = None
+    ntype = 'IN'
+    atype = 'IP4'
+    addr = SipConf.my_address
 
     def __init__(self, body = None, cself = None):
-        if body != None:
+        if body:
             self.ntype, self.atype, self.addr = body.split()[:3]
-        else:
+        elif cself:
             self.ntype = cself.ntype
             self.atype = cself.atype
             self.addr = cself.addr

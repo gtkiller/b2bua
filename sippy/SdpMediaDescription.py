@@ -31,7 +31,7 @@ f_types = {'m':SdpMedia, 'i':SdpGeneric, 'c':SdpConnecton, 'b':SdpGeneric, \
   'k':SdpGeneric}
 
 class SdpMediaDescription(object):
-    m_header = None
+    m_header = SdpMedia()
     i_header = None
     c_header = None
     b_header = None
@@ -41,7 +41,7 @@ class SdpMediaDescription(object):
     needs_update = True
 
     def __init__(self, cself = None):
-        if cself != None:
+        if cself:
             for header_name in [x + '_header' for x in self.all_headers]:
                 try:
                     setattr(self, header_name, getattr(cself, header_name).getCopy())
@@ -55,7 +55,7 @@ class SdpMediaDescription(object):
         s = ''
         for name in self.all_headers:
             header = getattr(self, name + '_header')
-            if header != None:
+            if header:
                 s += '%s=%s\r\n' % (name, str(header))
         for header in self.a_headers:
             s += 'a=%s\r\n' % str(header)
@@ -85,3 +85,4 @@ class SdpMediaDescription(object):
             self.a_headers.append(header)
         else:
             setattr(self, name + '_header', f_types[name](header))
+

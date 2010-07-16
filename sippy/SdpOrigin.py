@@ -28,24 +28,19 @@ from SipConf import SipConf
 from time import time
 
 class SdpOrigin(object):
-    username = None
-    session_id = None
-    version = None
-    network_type = None
-    address_type = None
-    address = None
+    username = '-'
     session_id = int(time() * 1000.0)
+    version = session_id
+    network_type = 'IN'
+    address_type = 'IP4'
+    address = SipConf.my_address
 
     def __init__(self, body = None, cself = None):
-        if body != None:
+        if body:
             self.username, self.session_id, self.version, self.network_type, self.address_type, self.address = body.split()
-        elif cself == None:
-            self.username = '-'
+        elif not cself:
             SdpOrigin.session_id += 1
             self.version = self.session_id
-            self.network_type = 'IN'
-            self.address_type = 'IP4'
-            self.address = SipConf.my_address
         else:
             self.username = cself.username
             self.session_id = cself.session_id

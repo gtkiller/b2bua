@@ -35,24 +35,24 @@ f_types = {'v':SdpGeneric, 'o':SdpOrigin, 's':SdpGeneric, 'i':SdpGeneric, \
   'k':SdpGeneric}
 
 class SdpBody(object):
-    v_header = None
-    o_header = None
-    s_header = None
+    v_header = '0'
+    o_header = SdpOrigin()
+    s_header = 'b2bua'
     i_header = None
     u_header = None
     e_header = None
     p_header = None
-    c_header = None
+    c_header = SdpConnecton() 
     b_header = None
-    t_header = None
+    t_header = '0 0'
     r_header = None
     z_header = None
     k_header = None
-    a_headers = None
+    a_headers = ['sendrecv', 'rtpmap:0 pcmu/8000', 'rtpmap:8 pcma/8000', 'rtpmap:101 telephone-event/8000']
     first_half = ('v', 'o', 's', 'i', 'u', 'e', 'p')
     second_half = ('b', 't', 'r', 'z', 'k')
     all_headers = ('v', 'o', 's', 'i', 'u', 'e', 'p', 'c', 'b', 't', 'r', 'z', 'k')
-    sections = None
+    sections = [SdpMediaDescription()]
 
     def __init__(self, body = None, cself = None):
         if cself:
@@ -64,10 +64,10 @@ class SdpBody(object):
             self.a_headers = [x for x in cself.a_headers]
             self.sections = [x.getCopy() for x in cself.sections]
             return
-        self.a_headers = []
-        self.sections = []
         if not body:
             return
+        self.a_headers = []
+        self.sections = []
         avpairs = [x.split('=', 1) for x in body.strip().splitlines()]
         current_snum = 0
         c_header = None
@@ -104,18 +104,18 @@ class SdpBody(object):
                 header = getattr(self, name + '_header')
                 if header != None:
                     s += '%s=%s\r\n' % (name, str(header))
+            s += self.sections[0].noCStr()
             for header in self.a_headers:
                 s += 'a=%s\r\n' % str(header)
-            s += self.sections[0].noCStr()
             return s
         for name in self.all_headers:
             header = getattr(self, name + '_header')
             if header != None:
                 s += '%s=%s\r\n' % (name, str(header))
-        for header in self.a_headers:
-            s += 'a=%s\r\n' % str(header)
         for section in self.sections:
             s += str(section)
+        for header in self.a_headers:
+            s += 'a=%s\r\n' % str(header)
         return s
 
     def __iadd__(self, other):
@@ -133,3 +133,4 @@ class SdpBody(object):
             self.a_headers.append(header)
         else:
             setattr(self, name + '_header', f_types[name](header))
+
