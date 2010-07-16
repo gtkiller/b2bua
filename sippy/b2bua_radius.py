@@ -458,7 +458,7 @@ class CallController(object):
         self.cld = fr
 
 #TODO: move to a subroutine()
-        t = str(time())
+        t = str(int(time()))
         a = global_config['sip_address'] 
         content = \
         "v=0\r\n" \
