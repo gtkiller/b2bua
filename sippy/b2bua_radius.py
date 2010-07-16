@@ -380,17 +380,14 @@ class CallController(object):
                 # The right phone answered.
                 # A re-INVITE should be sent to the left phone.
                 body = self.uaO.rSDP #TODO: a get method()?
-                print 'self.cli:', self.cli
-                event = CCEventUpdate(body, origin = self.cli) #TODO: origin?
+                event = CCEventUpdate(body)
                 self.uaO.delayed_remote_sdp_update(event, body)
         else:
             # Command 'make call'.
             self.uaA = self.uaO
             self.uaO = None
 
-            tmp = self.cli
-            self.cli = self.cld
-            self.cld = tmp
+            self.cli, self.cld = self.cld, self.cli
             body = self.uaA.rSDP #TODO: a get method()?
 
             self.cId = SipCallId()
