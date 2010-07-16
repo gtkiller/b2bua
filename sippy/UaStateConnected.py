@@ -67,8 +67,8 @@ class UaStateConnected(UaStateGeneric):
                 self.ua.global_config['sip_tm'].sendResponse(req.genResponse(200, 'OK', self.ua.lSDP))
                 return None
             event = CCEventUpdate(body, rtime = req.rtime, origin = self.ua.origin)
-            if body != None:
-                if self.ua.on_remote_sdp_change != None:
+            if body:
+                if self.ua.on_remote_sdp_change:
                     self.ua.on_remote_sdp_change(body, lambda x: self.ua.delayed_remote_sdp_update(event, x))
                     return (UasStateUpdating,)
                 else:

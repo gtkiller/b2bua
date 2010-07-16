@@ -216,7 +216,7 @@ class UA(object):
         self.recvEvent(CCEventInfo(body.getCopy(), rtime = rtime))
 
     def changeState(self, newstate):
-        if self.state != None:
+        if self.state:
             self.state.onStateChange(newstate[0])
         self.state = newstate[0](self)
         if len(newstate) > 1:
@@ -224,15 +224,15 @@ class UA(object):
                 callback(self, *newstate[2:])
 
     def emitEvent(self, event):
-        if self.event_cb != None:
-            if self.elast_seq != None and self.elast_seq >= event.seq:
+        if self.event_cb:
+            if self.elast_seq and self.elast_seq >= event.seq:
                 #print 'ignoring out-of-order event', event, event.seq, self.elast_seq, self.cId
                 return
             self.elast_seq = event.seq
             self.event_cb(event, self)
 
     def emitPendingEvents(self):
-        while len(self.equeue) != 0 and self.event_cb != None:
+        while self.equeue and self.event_cb:
             event = self.equeue.pop(0)
             if self.elast_seq != None and self.elast_seq >= event.seq:
                 #print 'ignoring out-of-order event', event, event.seq, self.elast_seq, self.cId
