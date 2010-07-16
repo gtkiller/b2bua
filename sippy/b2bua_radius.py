@@ -368,10 +368,21 @@ class CallController(object):
         self.uaA.disconnect(rtime = rtime)
 
     def oConn(self, ua, rtime, origin):
+        print '\n\n\noConn:', self.uaA.state, '\n\n'
+        #TODO: use different conn_handlers
         if self.uaA.state:
-            # Regular call.
-            if self.acctO:
-                self.acctO.conn(ua, rtime, origin)
+            if isinstance(self.uaA.state, UasStateRinging):
+                # Regular call.
+                if self.acctO:
+                    self.acctO.conn(ua, rtime, origin)
+            else:
+                # make call.
+                # The right phone answered.
+                # A re-INVITE should be sent to the left phone.
+                body = self.uaO.rSDP #TODO: a get method()?
+                print 'self.cli:', self.cli
+                event = CCEventUpdate(body, origin = self.cli) #TODO: origin?
+                self.uaO.delayed_remote_sdp_update(event, body)
         else:
             # Command 'make call'.
             self.uaA = self.uaO
