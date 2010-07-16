@@ -134,14 +134,14 @@ class UaStateConnected(UaStateGeneric):
         if isinstance(event, CCEventUpdate):
             body = event.getData()
             if str(self.ua.lSDP) == str(body):
-                if self.ua.rSDP != None:
+                if self.ua.rSDP:
                     self.ua.equeue.append(CCEventConnect((200, 'OK', self.ua.rSDP.getCopy()), \
                         rtime = event.rtime, origin = event.origin))
                 else:
                     self.ua.equeue.append(CCEventConnect((200, 'OK', None), rtime = event.rtime, \
                       origin = event.origin))
                 return None
-            if body != None and self.ua.on_local_sdp_change != None and body.needs_update:
+            if body and self.ua.on_local_sdp_change and body.needs_update:
                 self.ua.on_local_sdp_change(body, lambda x: self.ua.recvEvent(event))
                 return None
             req = self.ua.genRequest('INVITE', body)
