@@ -456,28 +456,10 @@ class CallController(object):
         self.cGUID = SipCiscoGUID()
         self.cli = to 
         self.cld = fr
-
-#TODO: move to a subroutine()
-        t = str(int(time()))
-        a = global_config['sip_address'] 
-        content = \
-        "v=0\r\n" \
-        "o=- " + t + " " + t + " IN IP4 " + a + "\r\n" \
-        "s=b2bua\r\n" \
-        "c=IN IP4 " + a + "\r\n" \
-        "t=0 0\r\n" \
-        "a=sendrecv\r\n" \
-        "m=audio 35000 RTP/AVP 0 8 101\r\n" \
-        "a=rtpmap:0 PCMU/8000\r\n" \
-        "a=rtpmap:8 PCMA/8000\r\n" \
-        "a=rtpmap:101 telephone-event/8000\r\n" 
-
-        body = MsgBody(content)
-#TODO end
         self.cId = SipCallId()
         self.caller_name = self.cli
         auth = None
-        ev = CCEventTry((self.cId, self.cGUID, self.cli, self.cld, body, auth, self.cli), origin = self.cld)
+        ev = CCEventTry((self.cId, self.cGUID, self.cli, self.cld, MsgBody(), auth, self.cli), origin = self.cld)
         self.eTry = ev
         self.state = CCStateWaitARoute
         self.username = self.remote_ip
