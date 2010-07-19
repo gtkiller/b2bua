@@ -48,7 +48,7 @@ class SdpBody(object):
     r_header = None
     z_header = None
     k_header = None
-    a_headers = ['sendrecv', 'rtpmap:0 pcmu/8000', 'rtpmap:8 pcma/8000', 'rtpmap:101 telephone-event/8000']
+    a_headers = []
     first_half = ('v', 'o', 's', 'i', 'u', 'e', 'p')
     second_half = ('b', 't', 'r', 'z', 'k')
     all_headers = ('v', 'o', 's', 'i', 'u', 'e', 'p', 'c', 'b', 't', 'r', 'z', 'k')
@@ -66,7 +66,6 @@ class SdpBody(object):
             return
         if not body:
             return
-        self.a_headers = []
         self.sections = []
         avpairs = [x.split('=', 1) for x in body.strip().splitlines()]
         current_snum = 0

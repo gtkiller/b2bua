@@ -36,7 +36,7 @@ class SdpMediaDescription(object):
     c_header = None
     b_header = None
     k_header = None
-    a_headers = None
+    a_headers = ['rtpmap:0 pcmu/8000', 'rtpmap:8 pcma/8000', 'rtpmap:101 telephone-event/8000', 'sendrecv']
     all_headers = ('m', 'i', 'c', 'b', 'k')
     needs_update = True
 
@@ -49,7 +49,6 @@ class SdpMediaDescription(object):
                     pass
             self.a_headers = [x for x in cself.a_headers]
             return
-        self.a_headers = []
 
     def __str__(self):
         s = ''
