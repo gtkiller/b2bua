@@ -368,7 +368,6 @@ class CallController(object):
         self.uaA.disconnect(rtime = rtime)
 
     def oConn(self, ua, rtime, origin):
-        print '\n\n\noConn:', self.uaA.state, '\n\n'
         #TODO: use different conn_handlers
         if self.uaA.state:
             if isinstance(self.uaA.state, UasStateRinging):
