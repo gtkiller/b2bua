@@ -104,18 +104,18 @@ class SdpBody(object):
                 header = getattr(self, name + '_header')
                 if header != None:
                     s += '%s=%s\r\n' % (name, str(header))
-            s += self.sections[0].noCStr()
             for header in self.a_headers:
                 s += 'a=%s\r\n' % str(header)
+            s += self.sections[0].noCStr()
             return s
         for name in self.all_headers:
             header = getattr(self, name + '_header')
             if header != None:
                 s += '%s=%s\r\n' % (name, str(header))
-        for section in self.sections:
-            s += str(section)
         for header in self.a_headers:
             s += 'a=%s\r\n' % str(header)
+        for section in self.sections:
+            s += str(section)
         return s
 
     def __iadd__(self, other):
