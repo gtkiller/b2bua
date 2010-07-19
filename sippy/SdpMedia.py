@@ -58,6 +58,9 @@ class SdpMedia(object):
             self.transport = cself.transport
             self.formats = cself.formats[:]
 
+    def get_formats(self):
+        return self.formats
+
     def __str__(self):
         rval = '%s %d %s' % (self.stype, self.port, self.transport)
         if self.type == MTAudio:
