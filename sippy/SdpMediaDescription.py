@@ -30,13 +30,16 @@ from SdpGeneric import SdpGeneric
 f_types = {'m':SdpMedia, 'i':SdpGeneric, 'c':SdpConnecton, 'b':SdpGeneric, \
   'k':SdpGeneric}
 
+rtpmap = [(0,'PCMU/8000'), (3,'GSM/8000'), (4,'G723/8000'), (8,'PCMA/8000'), \
+  (9,'G722/8000'), (15,'G728/8000'), (18,'G729/8000'), (101,'telephone-event/8000')]
+
 class SdpMediaDescription(object):
     m_header = SdpMedia()
     i_header = None
     c_header = None
     b_header = None
     k_header = None
-    a_headers = ['rtpmap:0 pcmu/8000', 'rtpmap:8 pcma/8000', 'rtpmap:101 telephone-event/8000', 'sendrecv']
+    a_headers = []
     all_headers = ('m', 'i', 'c', 'b', 'k')
     needs_update = True
 
@@ -49,6 +52,9 @@ class SdpMediaDescription(object):
                     pass
             self.a_headers = [x for x in cself.a_headers]
             return
+        fmts = self.m_header.get_formats()
+        self.a_headers = ['rtpmap:' + str(pt) + ' ' + n for pt,n in rtpmap if pt in fmts]
+        self.a_headers.append('sendrecv')
 
     def __str__(self):
         s = ''
