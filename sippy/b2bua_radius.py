@@ -79,8 +79,10 @@ class CCStateIdle(object):
     sname = 'Idle'
 class CCStateWaitRoute(object):
     sname = 'WaitRoute'
-class CCStateWaitARoute(object):
-    sname = 'WaitARoute'
+class CCStateWaitRouteA(object):
+    sname = 'WaitRouteA'
+class CCStateWaitRouteO(object):
+    sname = 'WaitRouteO'
 class CCStateARComplete(object):
     sname = 'ARComplete'
 class CCStateConnected(object):
@@ -126,6 +128,11 @@ class CallController(object):
         self.pass_headers = pass_headers
 
     def recvEvent(self, event, ua):
+        print 'recvEvent():', self.state, ua == self.uaA, event
+        if self.uaA:
+            print 'self.uaA.state:', self.uaA.state
+        if self.uaO:
+            print 'self.uaO.state:', self.uaO.state
         if ua == self.uaA:
             if self.state == CCStateIdle:
                 if not isinstance(event, CCEventTry):
@@ -134,7 +141,7 @@ class CallController(object):
                     return
                 self.cId, cGUID, self.cli, self.cld, body, auth, self.caller_name = event.getData()
                 self.cGUID = cGUID.hexForm()
-                if self.cld == None:
+                if not self.cld:
                     self.uaA.recvEvent(CCEventFail((500, 'Internal Server Error (1)'), rtime = event.rtime))
                     self.state = CCStateDead
                     return
@@ -218,7 +225,7 @@ class CallController(object):
         else:
             self.acctA = FakeAccounting()
         # Check that uaA is still in a valid state, send acct stop
-        if not self.state == CCStateWaitARoute and not isinstance(self.uaA.state, UasStateTrying):
+        if not self.state == CCStateWaitRouteA and not self.state == CCStateWaitRouteO and not isinstance(self.uaA.state, UasStateTrying):
             self.acctA.disc(self.uaA, time(), 'caller')
             return
         cli = [x[1][4:] for x in results[0] if x[0] == 'h323-ivr-in' and x[1].startswith('CLI:')]
@@ -317,10 +324,20 @@ class CallController(object):
             self.uaA.recvEvent(CCEventFail((500, 'Internal Server Error (3)')))
             self.state = CCStateDead
             return
-        self.state = CCStateARComplete
-        self.placeOriginate(self.routes.pop(0))
+        print 'self.state:', self.state
+        if self.state == CCStateWaitRouteA:
+            # Make call. Got radius auth for the A phone.
+            self.uaA = self.placeOriginate(self.routes.pop(0), [self.aConnA])
+        elif self.state == CCStateWaitRouteO:
+            # Make call. Got radius auth for the O phone.
+            self.state = CCStateARComplete
+            self.uaO = self.placeOriginate(self.routes.pop(0), [self.oConnA])
+        else:
+            # Regular call. Got radius auth for the O phone.
+            self.state = CCStateARComplete
+            self.uaO = self.placeOriginate(self.routes.pop(0), [self.oConn])
 
-    def placeOriginate(self, args):
+    def placeOriginate(self, args, conn_handlers):
         cId, cGUID, cli, cld, body, auth, caller_name = self.eTry.getData()
         rnum, host, cld, credit_time, expires, no_progress_expires, forward_on_fail, user, passw, cli, \
           parameters = args
@@ -344,67 +361,73 @@ class CallController(object):
         else:
             self.acctO = None
         self.acctA.credit_time = credit_time
-        conn_handlers = [self.oConn]
         disc_handlers = []
         if not forward_on_fail and self.global_config['acct_enable']:
             disc_handlers.append(self.acctO.disc)
-        self.uaO = UA(self.global_config, self.recvEvent, user, passw, (host, port), credit_time, tuple(conn_handlers), \
+        ua = UA(self.global_config, self.recvEvent, user, passw, (host, port), credit_time, tuple(conn_handlers), \
           tuple(disc_handlers), tuple(disc_handlers), dead_cbs = (self.oDead,), expire_time = expires, \
           no_progress_time = no_progress_expires, extra_headers = parameters.get('extra_headers', None))
-        if self.rtp_proxy_session != None and parameters.get('rtpp', True):
-            self.uaO.on_local_sdp_change = self.rtp_proxy_session.on_caller_sdp_change
-            self.uaO.on_remote_sdp_change = self.rtp_proxy_session.on_callee_sdp_change
+        if self.rtp_proxy_session and parameters.get('rtpp', True):
+            ua.on_local_sdp_change = self.rtp_proxy_session.on_caller_sdp_change
+            ua.on_remote_sdp_change = self.rtp_proxy_session.on_callee_sdp_change
             body = body.getCopy()
             body.content += 'a=nortpproxy:yes\r\n'
             self.proxied = True
-        self.uaO.kaInterval = self.global_config['ka_orig']
+        ua.kaInterval = self.global_config['ka_orig']
         if parameters.has_key('group_timeout'):
             timeout, skipto = parameters['group_timeout']
             Timeout(self.group_expires, timeout, 1, skipto)
-        self.uaO.recvEvent(CCEventTry((cId + '-b2b_%d' % rnum, cGUID, cli, cld, body, auth, \
+        ua.recvEvent(CCEventTry((cId + '-b2b_%d' % rnum, cGUID, cli, cld, body, auth, \
           parameters.get('caller_name', self.caller_name))))
+        return ua
 
     def disconnect(self, rtime = None):
         self.uaA.disconnect(rtime = rtime)
 
     def oConn(self, ua, rtime, origin):
-        #TODO: use different conn_handlers
-        if self.uaA.state:
-            if isinstance(self.uaA.state, UasStateRinging):
-                # Regular call.
-                if self.acctO:
-                    self.acctO.conn(ua, rtime, origin)
-            else:
-                # make call.
-                # The right phone answered.
-                # A re-INVITE should be sent to the left phone.
-                body = self.uaO.rSDP #TODO: a get method()?
-                event = CCEventUpdate(body)
-                self.uaO.delayed_remote_sdp_update(event, body)
-        else:
-            # Command 'make call'.
-            self.uaA = self.uaO
-            self.uaO = None
+        print 'oConn(): self.state:', self.state, ', self.uaA.state:', self.uaA.state,
+#        traceback.print_stack(file = sys.stdout)
+        if self.acctO:
+            self.acctO.conn(ua, rtime, origin)
 
-            self.cli, self.cld = self.cld, self.cli
-            body = self.uaA.rSDP #TODO: a get method()?
-
-            self.cId = SipCallId()
-            self.caller_name = self.cli
-            auth = None
-            ev = CCEventTry((self.cId, self.cGUID, self.cli, self.cld, body, auth, self.cli), origin = self.cld)
-            self.eTry = ev
-            self.state = CCStateWaitARoute
-            self.username = self.remote_ip
-            if self.global_config['auth_enable']:
-                self.auth_proc = self.global_config['radius_client'].do_auth(self.remote_ip, self.cli, self.cld, self.cGUID, \
-                    self.cId, self.remote_ip, self.rDone)
-            else:
-                self.rDone(((), 0))
+    def oConnA(self, ua, rtime, origin):
+        print 'oConnA(): self.state:', self.state, ', self.uaA.state:', self.uaA.state,
+#        traceback.print_stack(file = sys.stdout)
+        # make call.
+        # The right phone answered.
+        # A re-INVITE should be sent to the left phone.
+        body = self.uaO.rSDP #TODO: a get method()?
+        event = CCEventUpdate(body)
+        self.uaO.delayed_remote_sdp_update(event, body)
 
     def aConn(self, ua, rtime, origin):
+        print 'aConn(): self.state:', self.state
+#        traceback.print_stack(file = sys.stdout)
         self.state = CCStateConnected
         self.acctA.conn(ua, rtime, origin)
+
+    def aConnA(self, ua, rtime, origin):
+        print 'aConnA(): self.state:', self.state, ', self.uaA.state:', self.uaA.state,
+#        traceback.print_stack(file = sys.stdout)
+        # Command 'make call'.
+        # The left phone answered.
+        # An INVITE should be sent to the right phone.
+        #TODO: move to a subroutine
+        self.cli, self.cld = self.cld, self.cli
+        body = self.uaA.rSDP #TODO: a get method()?
+
+        self.cId = SipCallId()
+        self.caller_name = self.cli
+        auth = None
+        ev = CCEventTry((self.cId, self.cGUID, self.cli, self.cld, body, auth, self.cli), origin = self.cld)
+        self.eTry = ev
+        self.state = CCStateWaitRouteO
+        self.username = self.remote_ip
+        if self.global_config['auth_enable']:
+            self.auth_proc = self.global_config['radius_client'].do_auth(self.remote_ip, self.cli, self.cld, self.cGUID, \
+                self.cId, self.remote_ip, self.rDone)
+        else:
+            self.rDone(((), 0))
 
     def aDisc(self, ua, rtime, origin, result = 0):
         if self.state == CCStateWaitRoute and self.auth_proc != None:
@@ -460,7 +483,7 @@ class CallController(object):
         auth = None
         ev = CCEventTry((self.cId, self.cGUID, self.cli, self.cld, MsgBody(), auth, self.cli), origin = self.cld)
         self.eTry = ev
-        self.state = CCStateWaitARoute
+        self.state = CCStateWaitRouteA
         self.username = self.remote_ip
         if self.global_config['auth_enable']:
             self.auth_proc = self.global_config['radius_client'].do_auth(self.remote_ip, self.cli, self.cld, self.cGUID, \
