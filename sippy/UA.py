@@ -97,27 +97,27 @@ class UA(object):
         self.rAddr = nh_address
         self.rAddr0 = self.rAddr
         self.credit_time = credit_time
-        if conn_cbs != None:
+        if conn_cbs:
             self.conn_cbs = conn_cbs
         else:
             self.conn_cbs = ()
-        if disc_cbs != None:
+        if disc_cbs:
             self.disc_cbs = disc_cbs
         else:
             self.disc_cbs = ()
-        if fail_cbs != None:
+        if fail_cbs:
             self.fail_cbs = fail_cbs
         else:
             self.fail_cbs = ()
-        if ring_cbs != None:
+        if ring_cbs:
             self.ring_cbs = ring_cbs
         else:
             self.ring_cbs = ()
-        if dead_cbs != None:
+        if dead_cbs:
             self.dead_cbs = dead_cbs
         else:
             self.dead_cbs = ()
-        if ltag != None:
+        if ltag:
             self.lTag = ltag
         else:
             self.lTag = md5(str((random() * 1000000000L) + time())).hexdigest()
@@ -130,33 +130,33 @@ class UA(object):
     def recvRequest(self, req):
         #print 'Received request %s in state %s instance %s' % (req.getMethod(), self.state, self)
         #print self.rCSeq, req.getHFBody('cseq').getCSeqNum()
-        if self.user_agent == None:
+        if not self.user_agent:
             self.update_ua(req)
         if self.rCSeq != None and self.rCSeq >= req.getHFBody('cseq').getCSeqNum():
             return (req.genResponse(500, 'Server Internal Error'), None, None)
         self.rCSeq = req.getHFBody('cseq').getCSeqNum()
-        if self.state == None:
+        if not self.state:
             if req.getMethod() == 'INVITE':
                 self.changeState((UasStateIdle,))
             else:
                 return None
         newstate = self.state.recvRequest(req)
-        if newstate != None:
+        if newstate:
             self.changeState(newstate)
         self.emitPendingEvents()
-        if newstate != None and req.getMethod() == 'INVITE':
+        if newstate and req.getMethod() == 'INVITE':
             return (None, self.state.cancel, self.disconnect)
         else:
             return None
 
     def recvResponse(self, resp):
-        if self.state == None:
+        if not self.state:
             return
         self.update_ua(resp)
         code, reason = resp.getSCode()
         cseq, method = resp.getHFBody('cseq').getCSeq()
         if method == 'INVITE' and self.reqs.has_key(cseq) and code == 401 and resp.countHFs('www-authenticate') != 0 and \
-          self.username != None and self.password != None and self.reqs[cseq].countHFs('authorization') == 0:
+          self.username and self.password and self.reqs[cseq].countHFs('authorization') == 0:
             challenge = resp.getHFBody('www-authenticate')
             req = self.genRequest('INVITE', self.lSDP, challenge.getNonce(), challenge.getRealm())
             self.lCSeq += 1
@@ -164,7 +164,7 @@ class UA(object):
             del self.reqs[cseq]
             return None
         if method == 'INVITE' and self.reqs.has_key(cseq) and code == 407 and resp.countHFs('proxy-authenticate') != 0 and \
-          self.username != None and self.password != None and self.reqs[cseq].countHFs('proxy-authorization') == 0:
+          self.username and self.password and self.reqs[cseq].countHFs('proxy-authorization') == 0:
             challenge = resp.getHFBody('proxy-authenticate')
             req = self.genRequest('INVITE', self.lSDP, challenge.getNonce(), challenge.getRealm(), SipProxyAuthorization)
             self.lCSeq += 1
@@ -174,24 +174,24 @@ class UA(object):
         if code >= 200 and self.reqs.has_key(cseq):
             del self.reqs[cseq]
         newstate = self.state.recvResponse(resp)
-        if newstate != None:
+        if newstate:
             self.changeState(newstate)
         self.emitPendingEvents()
 
     def recvEvent(self, event):
         #print self, event
-        if self.state == None:
+        if not self.state:
             if isinstance(event, CCEventTry) or isinstance(event, CCEventFail) or isinstance(event, CCEventDisconnect):
                 self.changeState((UacStateIdle,))
             else:
                 return
         newstate = self.state.recvEvent(event)
-        if newstate != None:
+        if newstate:
             self.changeState(newstate)
         self.emitPendingEvents()
 
     def disconnect(self, rtime = None):
-        if rtime == None:
+        if not rtime:
             rtime = time()
         self.equeue.append(CCEventDisconnect(rtime = rtime))
         self.recvEvent(CCEventDisconnect(rtime = rtime))
@@ -287,27 +287,27 @@ class UA(object):
         return self
 
     def isDead(self):
-        if self.state != None:
+        if self.state:
             return self.state.dead
         return False
 
     def isConnected(self):
-        if self.state != None:
+        if self.state:
             return self.state.connected
         return False
 
     def getCLD(self):
-        if self.rUri == None:
+        if not self.rUri:
             return None
         return self.rUri.getUrl().username
 
     def getCLI(self):
-        if self.lUri == None:
+        if not self.lUri:
             return None
         return self.lUri.getUrl().username
 
     def getCallingName(self):
-        if self.lUri == None:
+        if not self.lUri:
             return None
         return self.lUri.getUri().name
 
