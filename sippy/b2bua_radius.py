@@ -119,9 +119,10 @@ class CallController(object):
         self.id = CallController.id
         CallController.id += 1
         self.global_config = global_config
-        self.uaA = UA(self.global_config, event_cb = self.recvEvent, conn_cbs = (self.aConn,), disc_cbs = (self.aDisc,), \
-          fail_cbs = (self.aDisc,), dead_cbs = (self.aDead,))
-        self.uaA.kaInterval = self.global_config['ka_ans']
+        if remote_ip:
+            self.uaA = UA(self.global_config, event_cb = self.recvEvent, conn_cbs = (self.aConn,), disc_cbs = (self.aDisc,), \
+              fail_cbs = (self.aDisc,), dead_cbs = (self.aDead,))
+            self.uaA.kaInterval = self.global_config['ka_ans']
         self.state = CCStateIdle
         self.uaO = None
         self.routes = []
@@ -207,7 +208,7 @@ class CallController(object):
                 else:
                     code = None
                 if not code or code not in self.huntstop_scodes:
-                    self.placeOriginate(self.routes.pop(0), [self.oConn], [], [self.oDead])
+                    self.placeOriginate(self.routes.pop(0), self.oConn)
                     return
             self.uaA.recvEvent(event)
 
@@ -223,14 +224,17 @@ class CallController(object):
                 self.uaA.recvEvent(event)
                 self.state = CCStateDead
             return
-        if self.global_config['acct_enable']:
-            self.acctA = RadiusAccounting(self.global_config, 'answer', \
-              send_start = self.global_config['start_acct_enable'], itime = self.eTry.rtime)
-            self.acctA.setParams(self.username, self.cli, self.cld, self.cGUID, self.cId, self.remote_ip)
-        else:
-            self.acctA = FakeAccounting()
+        if not self.acctA:
+            if self.global_config['acct_enable']:
+                print 'creating self.acctA'
+                self.acctA = RadiusAccounting(self.global_config, 'answer', \
+                  send_start = self.global_config['start_acct_enable'], itime = self.eTry.rtime)
+                self.acctA.setParams(self.username, self.cli, self.cld, self.cGUID, self.cId, self.remote_ip)
+            else:
+                self.acctA = FakeAccounting()
         # Check that uaA is still in a valid state, send acct stop
         if not self.state == CCStateWaitRouteA and not self.state == CCStateWaitRouteO and not isinstance(self.uaA.state, UasStateTrying):
+            print 'sending acct stop A 2'
             self.acctA.disc(self.uaA, time(), 'caller')
             return
         cli = [x[1][4:] for x in results[0] if x[0] == 'h323-ivr-in' and x[1].startswith('CLI:')]
@@ -332,17 +336,17 @@ class CallController(object):
         print 'self.state:', self.state
         if self.state == CCStateWaitRouteA:
             # Make call. Got radius auth for the A phone.
-            self.uaA = self.placeOriginate(self.routes.pop(0), [self.aConnA], [self.aDisc], [self.aDead])
+            self.uaA = self.placeAnswer(self.routes.pop(0))
         elif self.state == CCStateWaitRouteO:
             # Make call. Got radius auth for the O phone.
             self.state = CCStateARComplete
-            self.uaO = self.placeOriginate(self.routes.pop(0), [self.oConnA], [], [self.oDead])
+            self.uaO = self.placeOriginate(self.routes.pop(0), self.oConnA)
         else:
             # Regular call. Got radius auth for the O phone.
             self.state = CCStateARComplete
-            self.uaO = self.placeOriginate(self.routes.pop(0), [self.oConn], [], [self.oDead])
+            self.uaO = self.placeOriginate(self.routes.pop(0), self.oConn)
 
-    def placeOriginate(self, args, conn_cbs, disc_cbs, dead_cbs):
+    def placeAnswer(self, args):
         cId, cGUID, cli, cld, body, auth, caller_name = self.eTry.getData()
         rnum, host, cld, credit_time, expires, no_progress_expires, forward_on_fail, user, passw, cli, \
           parameters = args
@@ -359,16 +363,53 @@ class CallController(object):
             else:
                 port = SipConf.default_port
             host = host[0]
+        ua = UA(self.global_config, self.recvEvent, user, passw, (host, port), credit_time, \
+          (self.aConnA,), (self.aDisc,), (self.aDisc,), dead_cbs = (self.aDead,), \
+          expire_time = expires, no_progress_time = no_progress_expires, \
+          extra_headers = parameters.get('extra_headers', None))
+        if self.rtp_proxy_session and parameters.get('rtpp', True):
+            ua.on_local_sdp_change = self.rtp_proxy_session.on_caller_sdp_change
+            ua.on_remote_sdp_change = self.rtp_proxy_session.on_callee_sdp_change
+            body = body.getCopy()
+            body.content += 'a=nortpproxy:yes\r\n'
+            self.proxied = True
+        ua.kaInterval = self.global_config['ka_ans'] #TODO: is this okay for uaA?
+        if parameters.has_key('group_timeout'):
+            timeout, skipto = parameters['group_timeout']
+            Timeout(self.group_expires, timeout, 1, skipto)
+        ua.recvEvent(CCEventTry((cId + '-b2b_%d' % rnum, cGUID, cli, cld, body, auth, \
+          parameters.get('caller_name', self.caller_name))))
+        return ua
+
+    def placeOriginate(self, args, conn_cbs):
+        cId, cGUID, cli, cld, body, auth, caller_name = self.eTry.getData()
+        rnum, host, cld, credit_time, expires, no_progress_expires, forward_on_fail, user, passw, cli, \
+          parameters = args
+        self.huntstop_scodes = parameters.get('huntstop_scodes', ())
+        if self.global_config.has_key('static_tr_out'):
+            cld = re_replace(self.global_config['static_tr_out'], cld)
+        if host == 'sip-ua':
+            host = self.source[0]
+            port = self.source[1]
+        else:
+            host = host.split(':', 1)
+            if len(host) > 1:
+                port = int(host[1])
+            else:
+                port = SipConf.default_port
+            host = host[0]
+        disc_cbs = []
         if not forward_on_fail and self.global_config['acct_enable']:
             self.acctO = RadiusAccounting(self.global_config, 'originate', send_start = self.global_config['start_acct_enable'])
             self.acctO.setParams(parameters.get('bill-to', self.username), parameters.get('bill-cli', cli), \
               parameters.get('bill-cld', cld), self.cGUID, self.cId, host, credit_time)
+            print 'adding acct stop cb'
             disc_cbs.append(self.acctO.disc)
         else:
             self.acctO = None
         self.acctA.credit_time = credit_time
         ua = UA(self.global_config, self.recvEvent, user, passw, (host, port), credit_time, \
-          tuple(conn_cbs), tuple(disc_cbs), tuple(disc_cbs), dead_cbs = tuple(dead_cbs), \
+          (conn_cbs,), tuple(disc_cbs), tuple(disc_cbs), dead_cbs = (self.oDead,), \
           expire_time = expires, no_progress_time = no_progress_expires, \
           extra_headers = parameters.get('extra_headers', None))
         if self.rtp_proxy_session and parameters.get('rtpp', True):
@@ -389,13 +430,13 @@ class CallController(object):
         self.uaA.disconnect(rtime = rtime)
 
     def oConn(self, ua, rtime, origin):
-        print 'oConn(): self.state:', self.state, ', self.uaA.state:', self.uaA.state,
+        print 'oConn(): self.state:', self.state, ', self.uaA.state:', self.uaA.state
 #        traceback.print_stack(file = sys.stdout)
         if self.acctO:
             self.acctO.conn(ua, rtime, origin)
 
     def oConnA(self, ua, rtime, origin):
-        print 'oConnA(): self.state:', self.state, ', self.uaA.state:', self.uaA.state,
+        print 'oConnA(): self.state:', self.state, ', self.uaA.state:', self.uaA.state
 #        traceback.print_stack(file = sys.stdout)
         # make call.
         # The right phone answered.
@@ -412,7 +453,7 @@ class CallController(object):
         self.acctA.conn(ua, rtime, origin)
 
     def aConnA(self, ua, rtime, origin):
-        print 'aConnA(): self.state:', self.state, ', self.uaA.state:', self.uaA.state,
+        print 'aConnA(): self.state:', self.state, ', self.uaA.state:', self.uaA.state
 #        traceback.print_stack(file = sys.stdout)
         # Command 'make call'.
         # The left phone answered.
@@ -435,6 +476,7 @@ class CallController(object):
             self.rDone(((), 0))
 
     def aDisc(self, ua, rtime, origin, result = 0):
+        print 'aDisc()'
         if self.state == CCStateWaitRoute and self.auth_proc:
             self.auth_proc.cancel()
             self.auth_proc = None
@@ -443,7 +485,9 @@ class CallController(object):
         else:
             self.state = CCStateDead
         if self.acctA:
+            print 'sending acct stop A'
             self.acctA.disc(ua, rtime, origin, result)
+            print 'sent acct stop A'
         if self.uaO:
             self.uaO.recvEvent(CCEventDisconnect(rtime = rtime, origin = origin))
         self.rtp_proxy_session = None
@@ -610,7 +654,7 @@ class CallMap(object):
             print gc.garbage
 
     def makeCall(self, fr, to):
-        source = remote_ip = global_config['sip_address']
+        source = remote_ip = None
         cc = CallController(remote_ip, source, self.global_config, pass_headers = [])
         self.ccmap.append(cc)
         cc.makeCall(fr, to)
