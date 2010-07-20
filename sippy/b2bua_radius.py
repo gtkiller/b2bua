@@ -85,6 +85,8 @@ class CCStateWaitRouteO(object):
     sname = 'WaitRouteO'
 class CCStateARComplete(object):
     sname = 'ARComplete'
+class CCStateUpdatingA(object):
+    sname = 'UpdatingA'
 class CCStateConnected(object):
     sname = 'Connected'
 class CCStateDead(object):
@@ -191,6 +193,9 @@ class CallController(object):
                     self.auth_proc = self.global_config['radius_client'].do_auth(auth.username, self.cli, self.cld, self.cGUID, 
                       self.cId, self.remote_ip, self.rDone, auth.realm, auth.nonce, auth.uri, auth.response)
                 return
+            if self.state == CCStateUpdatingA and isinstance(event, CCEventConnect):
+                self.state = CCStateConnected
+                #TODO: rad acct start
             if self.state not in (CCStateARComplete, CCStateConnected, CCStateDisconnecting) or not self.uaO:
                 return
             self.uaO.recvEvent(event)
@@ -396,6 +401,7 @@ class CallController(object):
         # make call.
         # The right phone answered.
         # A re-INVITE should be sent to the left phone.
+        self.state = CCStateUpdatingA
         body = self.uaO.rSDP #TODO: a get method()?
         event = CCEventUpdate(body)
         self.uaO.delayed_remote_sdp_update(event, body)
@@ -430,21 +436,21 @@ class CallController(object):
             self.rDone(((), 0))
 
     def aDisc(self, ua, rtime, origin, result = 0):
-        if self.state == CCStateWaitRoute and self.auth_proc != None:
+        if self.state == CCStateWaitRoute and self.auth_proc:
             self.auth_proc.cancel()
             self.auth_proc = None
-        if self.uaO != None and self.state != CCStateDead:
+        if self.uaO and self.state != CCStateDead:
             self.state = CCStateDisconnecting
         else:
             self.state = CCStateDead
-        if self.acctA != None:
+        if self.acctA:
             self.acctA.disc(ua, rtime, origin, result)
-        if self.uaO != None:
+        if self.uaO:
             self.uaO.recvEvent(CCEventDisconnect(rtime = rtime, origin = origin))
         self.rtp_proxy_session = None
 
     def aDead(self, ua):
-        if (self.uaO == None or isinstance(self.uaO.state, UaStateDead)):
+        if (not self.uaO or isinstance(self.uaO.state, UaStateDead)):
             if self.global_config['cmap'].debug_mode:
                 print 'garbadge collecting', self
             self.acctA = None
