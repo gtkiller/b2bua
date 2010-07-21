@@ -115,7 +115,7 @@ class CallController(object):
     proxied = False
     challenge = None
 
-    def __init__(self, remote_ip, source, global_config, pass_headers):
+    def __init__(self, remote_ip, source, global_config, pass_headers, username = None):
         self.id = CallController.id
         CallController.id += 1
         self.global_config = global_config
@@ -129,6 +129,7 @@ class CallController(object):
         self.remote_ip = remote_ip
         self.source = source
         self.pass_headers = pass_headers
+        self.username = username
 
     def recvEvent(self, event, ua):
         print 'recvEvent():', self.state, ua == self.uaA, event
@@ -143,6 +144,7 @@ class CallController(object):
                     self.uaA.recvEvent(CCEventDisconnect(rtime = event.rtime))
                     return
                 self.cId, cGUID, self.cli, self.cld, body, auth, self.caller_name = event.getData()
+                print 'auth:', auth
                 self.cGUID = cGUID.hexForm()
                 if not self.cld:
                     self.uaA.recvEvent(CCEventFail((500, 'Internal Server Error (1)'), rtime = event.rtime))
@@ -186,10 +188,12 @@ class CallController(object):
                     self.username = self.remote_ip
                     self.rDone(((), 0))
                 elif not auth or not auth.username:
+                    print 'setting username to remote ip ', self.remote_ip
                     self.username = self.remote_ip
                     self.auth_proc = self.global_config['radius_client'].do_auth(self.remote_ip, self.cli, self.cld, self.cGUID, \
                       self.cId, self.remote_ip, self.rDone)
                 else:
+                    print 'setting username auth username ', auth.username
                     self.username = auth.username
                     self.auth_proc = self.global_config['radius_client'].do_auth(auth.username, self.cli, self.cld, self.cGUID, 
                       self.cId, self.remote_ip, self.rDone, auth.realm, auth.nonce, auth.uri, auth.response)
@@ -264,7 +268,7 @@ class CallController(object):
         rnum = 0
         for route in routing:
             rnum += 1
-            if route[0].find('@') != -1:
+            if '@' in route[0]:
                 cld, host = route[0].split('@')
                 if not cld:
                     # Allow CLD to be forcefully removed by sending `Routing:@host' entry,
@@ -468,7 +472,6 @@ class CallController(object):
         ev = CCEventTry((self.cId, self.cGUID, self.cli, self.cld, body, auth, self.cli), origin = self.cld)
         self.eTry = ev
         self.state = CCStateWaitRouteO
-        self.username = self.remote_ip
         if self.global_config['auth_enable']:
             self.auth_proc = self.global_config['radius_client'].do_auth(self.remote_ip, self.cli, self.cld, self.cGUID, \
                 self.cId, self.remote_ip, self.rDone)
@@ -533,7 +536,6 @@ class CallController(object):
         ev = CCEventTry((self.cId, self.cGUID, self.cli, self.cld, MsgBody(), auth, self.cli), origin = self.cld)
         self.eTry = ev
         self.state = CCStateWaitRouteA
-        self.username = self.remote_ip
         if self.global_config['auth_enable']:
             self.auth_proc = self.global_config['radius_client'].do_auth(self.remote_ip, self.cli, self.cld, self.cGUID, \
                 self.cId, self.remote_ip, self.rDone)
@@ -573,6 +575,7 @@ class CallMap(object):
                 via = req.getHFBody('via', 0)
             remote_ip = via.getTAddr()[0]
             source = req.getSource()
+            print 'remote ip:', remote_ip, ', source:', source
 
             # First check if request comes from IP that
             # we want to accept our traffic from
@@ -655,7 +658,7 @@ class CallMap(object):
 
     def makeCall(self, fr, to):
         source = remote_ip = None
-        cc = CallController(remote_ip, source, self.global_config, pass_headers = [])
+        cc = CallController(remote_ip, source, self.global_config, pass_headers = [], username = fr)
         self.ccmap.append(cc)
         cc.makeCall(fr, to)
 
