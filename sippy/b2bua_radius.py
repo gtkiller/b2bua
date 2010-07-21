@@ -347,7 +347,7 @@ class CallController(object):
             self.uaO = self.placeOriginate(self.routes.pop(0), self.oConn)
 
     def placeAnswer(self, args):
-        cId, cGUID, cli, cld, body, auth, caller_name = self.eTry.getData()
+        cId, cGUID, cli, cld, body, auth, caller_name = self.eTry.getData() #TODO: move to a subroutine
         rnum, host, cld, credit_time, expires, no_progress_expires, forward_on_fail, user, passw, cli, \
           parameters = args
         self.huntstop_scodes = parameters.get('huntstop_scodes', ())
