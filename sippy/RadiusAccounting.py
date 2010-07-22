@@ -62,7 +62,7 @@ class RadiusAccounting(object):
     complete = False
 
     def __init__(self, global_config, origin, lperiod = None, send_start = False, itime = None):
-        if itime == None:
+        if not itime:
             self.iTime = time()
         else:
             self.iTime = itime
@@ -103,7 +103,7 @@ class RadiusAccounting(object):
         if self.drec:
             return
         self.drec = True
-        if self.el != None:
+        if self.el:
             self.el.cancel()
             self.el = None
         self.asend('Stop', rtime, origin, result)
@@ -111,11 +111,11 @@ class RadiusAccounting(object):
     def asend(self, type, rtime = None, origin = None, result = 0):
         if not self.complete:
             return
-        if rtime == None:
+        if not rtime:
             rtime = time()
         attributes = self._attributes[:]
         if type != 'Start':
-            if self.cTime != None:
+            if self.cTime:
                 duration = rtime - self.cTime
                 delay = self.cTime - self.iTime
             else:
