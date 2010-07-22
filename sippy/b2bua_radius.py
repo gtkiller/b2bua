@@ -483,7 +483,7 @@ class CallController(object):
         self.eTry = ev
         self.state = CCStateWaitRouteO
         if self.global_config['auth_enable']:
-            self.auth_proc = self.global_config['radius_client'].do_auth(self.remote_ip, self.cli, self.cld, self.cGUID, \
+            self.auth_proc = self.global_config['radius_client'].do_auth(self.cli, self.cli, self.cld, self.cGUID, \
                 self.cId, self.remote_ip, self.rDone)
         else:
             self.rDone(((), 0))
@@ -547,7 +547,7 @@ class CallController(object):
         self.eTry = ev
         self.state = CCStateWaitRouteA
         if self.global_config['auth_enable']:
-            self.auth_proc = self.global_config['radius_client'].do_auth(self.remote_ip, self.cli, self.cld, self.cGUID, \
+            self.auth_proc = self.global_config['radius_client'].do_auth(fr, self.cli, self.cld, self.cGUID, \
                 self.cId, self.remote_ip, self.rDone)
         else:
             self.rDone(((), 0))

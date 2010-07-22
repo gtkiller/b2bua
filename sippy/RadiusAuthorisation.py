@@ -37,7 +37,7 @@ class RadiusAuthorisation(Radius_client):
               ('Digest-Nonce', nonce), ('Digest-Method', 'INVITE'), ('Digest-URI', uri), \
               ('Digest-Algorithm', 'MD5'), ('Digest-User-Name', username), ('Digest-Response', response)]
         else:
-            attributes = [('User-Name', remote_ip), ('Password', 'cisco')]
+            attributes = [('User-Name', remote_ip if remote_ip else username), ('Password', 'cisco')]
         if caller == None:
             caller = ''
         attributes.extend((('Calling-Station-Id', caller), ('Called-Station-Id', callee), ('h323-conf-id', h323_cid), \
