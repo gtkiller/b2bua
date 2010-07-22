@@ -228,7 +228,7 @@ class CallController(object):
                 self.uaA.recvEvent(event)
                 self.state = CCStateDead
             return
-        if not self.acctA:
+        if not self.state == CCStateWaitRouteA and not self.state == CCStateWaitRouteO:
             if self.global_config['acct_enable']:
                 print 'creating self.acctA'
                 self.acctA = RadiusAccounting(self.global_config, 'answer', \
@@ -367,6 +367,13 @@ class CallController(object):
             else:
                 port = SipConf.default_port
             host = host[0]
+        if not forward_on_fail and self.global_config['acct_enable']:
+            self.acctA = RadiusAccounting(self.global_config, 'answer', send_start = self.global_config['start_acct_enable'])
+            self.acctA.setParams(parameters.get('bill-to', self.username), parameters.get('bill-cli', cli), \
+              parameters.get('bill-cld', cld), self.cGUID, self.cId, host, credit_time)
+            print 'adding acct stop cb'
+        else:
+            self.acctA = FakeAccounting()
         ua = UA(self.global_config, self.recvEvent, user, passw, (host, port), credit_time, \
           (self.aConnA,), (self.aDisc,), (self.aDisc,), dead_cbs = (self.aDead,), \
           expire_time = expires, no_progress_time = no_progress_expires, \
@@ -445,6 +452,8 @@ class CallController(object):
         # make call.
         # The right phone answered.
         # A re-INVITE should be sent to the left phone.
+        if self.acctO:
+            self.acctO.conn(ua, rtime, origin)
         self.state = CCStateUpdatingA
         body = self.uaO.rSDP #TODO: a get method()?
         event = CCEventUpdate(body)
@@ -463,6 +472,7 @@ class CallController(object):
         # The left phone answered.
         # An INVITE should be sent to the right phone.
         #TODO: move to a subroutine
+        self.acctA.conn(ua, rtime, origin)
         self.cli, self.cld = self.cld, self.cli
         body = self.uaA.rSDP #TODO: a get method()?
 
