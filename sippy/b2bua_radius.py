@@ -219,7 +219,7 @@ class CallController(object):
     def rDone(self, results):
         # Check that we got necessary result from Radius
         if len(results) != 2 or results[1] != 0:
-            if isinstance(self.uaA.state, UasStateTrying):
+            if self.uaA and isinstance(self.uaA.state, UasStateTrying):
                 if self.challenge != None:
                     event = CCEventFail((401, 'Unauthorized'))
                     event.extra_header = self.challenge
@@ -259,7 +259,8 @@ class CallController(object):
         if not self.global_config.has_key('static_route'):
             routing = [x for x in results[0] if x[0] == 'h323-ivr-in' and x[1].startswith('Routing:')]
             if not routing:
-                self.uaA.recvEvent(CCEventFail((500, 'Internal Server Error (2)')))
+                if self.uaA:
+                    self.uaA.recvEvent(CCEventFail((500, 'Internal Server Error (2)')))
                 self.state = CCStateDead
                 return
             routing = [x[1][8:].split(';') for x in routing]
@@ -334,7 +335,8 @@ class CallController(object):
               passw, cli, parameters))
             #print 'Got route:', host, cld
         if not self.routes:
-            self.uaA.recvEvent(CCEventFail((500, 'Internal Server Error (3)')))
+            if self.uaA:
+                self.uaA.recvEvent(CCEventFail((500, 'Internal Server Error (3)')))
             self.state = CCStateDead
             return
         print 'self.state:', self.state
