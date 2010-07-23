@@ -553,6 +553,7 @@ class CallController(object):
                 self.cId, self.remote_ip, self.rDone)
         else:
             self.rDone(((), 0))
+        return self.cGUID
 
 class CallMap(object):
     ccmap = None
@@ -672,7 +673,8 @@ class CallMap(object):
         source = remote_ip = None
         cc = CallController(remote_ip, source, self.global_config, pass_headers = [], username = fr)
         self.ccmap.append(cc)
-        cc.makeCall(fr, to)
+        guid = cc.makeCall(fr, to)
+        return guid
 
     def recvCommand(self, clim, cmd):
         try:
@@ -751,8 +753,8 @@ class CallMap(object):
                 if len(args) != 2:
                     clim.send('ERROR: syntax error:\n' + help + prompt)
                     return False
-                self.makeCall(args[0], args[1])
-                clim.send('OK\n' + prompt)
+                guid = self.makeCall(args[0], args[1])
+                clim.send(str(guid) + '\n' + prompt)
                 return False
             clim.send('ERROR: unknown command\n' + prompt)
         except:
