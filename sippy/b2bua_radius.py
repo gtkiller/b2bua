@@ -615,8 +615,7 @@ class CallMap(object):
             pass_headers = []
             for header in self.global_config['pass_headers']:
                 hfs = req.getHFs(header)
-                if len(hfs) > 0:
-                    pass_headers.extend(hfs)
+                pass_headers.extend(hfs)
             cc = CallController(remote_ip, source, self.global_config, pass_headers)
             cc.challenge = challenge
             rval = cc.uaA.recvRequest(req)

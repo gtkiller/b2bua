@@ -320,9 +320,9 @@ class UA(object):
     def getCID(self):
         # Return tuple containing call-id, local tag and remote tag
         rval = [str(self.cId), None, None]
-        if self.lUri != None:
+        if self.lUri:
             rval[1] = self.lUri.getTag()
-        if self.rUri != None:
+        if self.rUri:
             rval[2] = self.rUri.getTag()
         return tuple(rval)
 
