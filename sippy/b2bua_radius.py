@@ -220,7 +220,7 @@ class CallController(object):
         # Check that we got necessary result from Radius
         if len(results) != 2 or results[1] != 0:
             if self.uaA and isinstance(self.uaA.state, UasStateTrying):
-                if self.challenge != None:
+                if self.challenge:
                     event = CCEventFail((401, 'Unauthorized'))
                     event.extra_header = self.challenge
                 else:
@@ -576,7 +576,7 @@ class CallMap(object):
         #print gc.collect()
 
     def recvRequest(self, req):
-        if req.getHFBody('to').getTag() != None:
+        if req.getHFBody('to').getTag():
             # Request within dialog, but no such dialog
             return (req.genResponse(481, 'Call Leg/Transaction Does Not Exist'), None, None)
         if req.getMethod() == 'INVITE':
@@ -627,7 +627,7 @@ class CallMap(object):
         return (req.genResponse(501, 'Not Implemented'), None, None)
 
     def discAll(self, signum = None):
-        if signum != None:
+        if signum:
             print 'Signal %d received, disconnecting all calls' % signum
         for cc in tuple(self.ccmap):
             cc.disconnect()
@@ -752,7 +752,7 @@ class CallMap(object):
                     clim.send('ERROR: syntax error:\n' + help + prompt)
                     return False
                 self.makeCall(args[0], args[1])
-                clim.send('Not implemented\n' + prompt)
+                clim.send('OK\n' + prompt)
                 return False
             clim.send('ERROR: unknown command\n' + prompt)
         except:
@@ -910,9 +910,9 @@ if __name__ == '__main__':
         os.dup2(fd, sys.__stderr__.fileno())
         os.close(fd)
 
-    if laddr != None:
+    if laddr:
         SipConf.my_address = laddr
-    if lport != None:
+    if lport:
         SipConf.my_port = lport
     global_config['sip_logger'] = SipLogger('b2bua')
     global_config['sip_address'] = SipConf.my_address
