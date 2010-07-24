@@ -607,7 +607,7 @@ class CallMap(object):
                    challenge.getBody().realm = req.getRURI().host
                # Send challenge immediately if digest is the
                # only method of authenticating
-               if challenge and False: #TODO: typo?
+               if challenge:
                    resp = req.genResponse(401, 'Unauthorized')
                    resp.appendHeader(challenge)
                    return (resp, None, None)
