@@ -132,7 +132,7 @@ class CallController(object):
         self.username = username
 
     def recvEvent(self, event, ua):
-        print 'recvEvent():', self.state, ua == self.uaA, event
+        print 'received event', event, 'in state', self.state.sname + ', ua == self.uaA ?', ua == self.uaA
         if self.uaA:
             print 'self.uaA.state:', self.uaA.state
         if self.uaO:
@@ -165,7 +165,7 @@ class CallController(object):
                     mbody = body.content.sections[0].m_header
                     if mbody.transport.lower() == 'rtp/avp':
                         mbody.formats = [x for x in mbody.formats if x in allowed_pts]
-                        if len(mbody.formats) == 0:
+                        if not mbody.formats:
                             self.uaA.recvEvent(CCEventFail((488, 'Not Acceptable Here')))
                             self.state = CCStateDead
                             return
