@@ -258,6 +258,7 @@ class Rtp_proxy_session(object):
             if sect.m_header.port != 0:
                 sect.m_header.port = address_port[1]
         if len([x for x in sects if x.needs_update]) == 0:
+            self.origin.increase_ses_version()
             sdp_body.content.o_header = self.origin
             sdp_body.needs_update = False
             result_callback(sdp_body)

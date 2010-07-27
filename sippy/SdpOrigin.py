@@ -58,3 +58,7 @@ class SdpOrigin(object):
 
     def getCopy(self):
         return SdpOrigin(cself = self)
+
+    def increase_ses_version(self):
+        self.version += 1
+
