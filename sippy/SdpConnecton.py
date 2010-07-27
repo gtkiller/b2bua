@@ -27,9 +27,9 @@
 from SipConf import SipConf
 
 class SdpConnecton(object):
-    ntype = 'IN'
-    atype = 'IP4'
-    addr = SipConf.my_address
+    ntype = None
+    atype = None
+    addr = None
 
     def __init__(self, body = None, cself = None):
         if body:
@@ -38,6 +38,10 @@ class SdpConnecton(object):
             self.ntype = cself.ntype
             self.atype = cself.atype
             self.addr = cself.addr
+        else:
+            self.ntype = 'IN'
+            self.atype = 'IP4'
+            self.addr = SipConf.my_address
 
     def __str__(self):
         return '%s %s %s' % (self.ntype, self.atype, self.addr)

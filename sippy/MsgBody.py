@@ -30,8 +30,8 @@ from types import StringType
 b_types = {'application/sdp':SdpBody}
 
 class MsgBody(object):
-    content = SdpBody()
-    mtype = 'application/sdp'
+    content = None
+    mtype = None
     needs_update = True
     parsed = False
 
@@ -46,6 +46,9 @@ class MsgBody(object):
             else:
                 self.content = cself.content.getCopy()
             self.mtype = cself.mtype
+        else:
+            self.content = SdpBody()
+            self.mtype = mtype
 
     def parse(self):
         if not self.parsed:

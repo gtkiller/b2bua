@@ -34,7 +34,7 @@ rtpmap = [(0,'PCMU/8000'), (3,'GSM/8000'), (4,'G723/8000'), (8,'PCMA/8000'), \
   (9,'G722/8000'), (15,'G728/8000'), (18,'G729/8000'), (101,'telephone-event/8000')]
 
 class SdpMediaDescription(object):
-    m_header = SdpMedia()
+    m_header = None
     i_header = None
     c_header = None
     b_header = None
@@ -43,8 +43,16 @@ class SdpMediaDescription(object):
     all_headers = ('m', 'i', 'c', 'b', 'k')
     needs_update = True
 
-    def __init__(self, cself = None):
-        if cself:
+    def __init__(self, header = None, cself = None):
+        self.a_headers = []
+        if header:
+            name, v = header
+            if name in self.all_headers:
+                setattr(self, name + '_header', v)
+            elif 'a' == name and v not in self.a_headers:
+                self.a_headers = [v]
+            return
+        elif cself:
             for header_name in [x + '_header' for x in self.all_headers]:
                 try:
                     setattr(self, header_name, getattr(cself, header_name).getCopy())
@@ -52,6 +60,7 @@ class SdpMediaDescription(object):
                     pass
             self.a_headers = [x for x in cself.a_headers]
             return
+        self.m_header = SdpMedia()
         fmts = self.m_header.get_formats()
         self.a_headers = ['rtpmap:' + str(pt) + ' ' + n for pt,n in rtpmap if pt in fmts]
         self.a_headers.append('sendrecv')

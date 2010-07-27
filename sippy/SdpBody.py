@@ -36,13 +36,13 @@ f_types = {'v':SdpGeneric, 'o':SdpOrigin, 's':SdpGeneric, 'i':SdpGeneric, \
 
 class SdpBody(object):
     v_header = '0'
-    o_header = SdpOrigin()
+    o_header = None
     s_header = 'b2bua'
     i_header = None
     u_header = None
     e_header = None
     p_header = None
-    c_header = SdpConnecton() 
+    c_header = None
     b_header = None
     t_header = '0 0'
     r_header = None
@@ -52,9 +52,11 @@ class SdpBody(object):
     first_half = ('v', 'o', 's', 'i', 'u', 'e', 'p')
     second_half = ('b', 't', 'r', 'z', 'k')
     all_headers = ('v', 'o', 's', 'i', 'u', 'e', 'p', 'c', 'b', 't', 'r', 'z', 'k')
-    sections = [SdpMediaDescription()]
+    sections = []
 
     def __init__(self, body = None, cself = None):
+        self.a_headers = []
+        self.sections = []
         if cself:
             for header_name in [x + '_header' for x in self.all_headers]:
                 try:
@@ -65,6 +67,9 @@ class SdpBody(object):
             self.sections = [x.getCopy() for x in cself.sections]
             return
         if not body:
+            self.o_header = SdpOrigin()
+            self.c_header = SdpConnecton() 
+            self.sections = [SdpMediaDescription()]
             return
         self.sections = []
         avpairs = [x.split('=', 1) for x in body.strip().splitlines()]
@@ -74,12 +79,13 @@ class SdpBody(object):
             name = name.lower()
             if name == 'm':
                 current_snum += 1
-                self.sections.append(SdpMediaDescription())
+                self.sections.append(SdpMediaDescription((name, v)))
             if current_snum == 0:
                 if name == 'c':
                     c_header = v
                 elif name == 'a':
-                    self.a_headers.append(v)
+                    if v not in self.a_headers:
+                        self.a_headers.append(v)
                 else:
                     setattr(self, name + '_header', f_types[name](v))
             else:

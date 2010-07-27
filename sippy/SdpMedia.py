@@ -31,11 +31,11 @@ class MTOther(object):
     pass
 
 class SdpMedia(object):
-    type = MTAudio
-    stype = 'audio'
-    port = 35000
-    transport = 'RTP/AVP'
-    formats = [0, 8, 101]
+    type = None
+    stype = None
+    port = None
+    transport = None
+    formats = []
 
     def __init__(self, body = None, cself = None):
         if body:
@@ -57,6 +57,12 @@ class SdpMedia(object):
             self.port = cself.port
             self.transport = cself.transport
             self.formats = cself.formats[:]
+        else:
+            self.type = MTAudio
+            self.stype = 'audio'
+            self.port = 35000
+            self.transport = 'RTP/AVP'
+            self.formats = [0, 8, 101]
 
     def get_formats(self):
         return self.formats
