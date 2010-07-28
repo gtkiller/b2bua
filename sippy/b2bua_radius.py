@@ -201,6 +201,27 @@ class CallController(object):
             if self.state == CCStateUpdatingA and isinstance(event, CCEventConnect):
                 self.state = CCStateConnected
                 #TODO: rad acct start
+            if self.state == CCStateWaitRouteA and isinstance(event, CCEventConnect):
+                # Command 'make call'.
+                # The left phone answered.
+                # An INVITE should be sent to the right phone.
+                #TODO: move to a subroutine
+                self.cli, self.cld = self.cld, self.cli
+                body = self.uaA.rSDP #TODO: a get method()?
+                print 'body:\n', body
+
+                self.cId = SipCallId()
+                self.caller_name = self.cli
+                auth = None
+                ev = CCEventTry((self.cId, self.cGUID, self.cli, self.cld, body, auth, self.cli), origin = self.cld)
+                self.eTry = ev
+                print 'self.eTry.getData():', self.eTry.getData()
+                self.state = CCStateWaitRouteO
+                if self.global_config['auth_enable']:
+                    self.auth_proc = self.global_config['radius_client'].do_auth(self.cli, self.cli, self.cld, self.cGUID, \
+                        self.cId, self.remote_ip, self.rDone)
+                else:
+                    self.rDone(((), 0))
             if self.state not in (CCStateARComplete, CCStateConnected, CCStateDisconnecting) or not self.uaO:
                 return
             self.uaO.recvEvent(event)
@@ -346,6 +367,7 @@ class CallController(object):
         elif self.state == CCStateWaitRouteO:
             # Make call. Got radius auth for the O phone.
             self.state = CCStateARComplete
+            print 'self.eTry.getData():', self.eTry.getData()
             self.uaO = self.placeOriginate(self.routes.pop(0), self.oConnA)
         else:
             # Regular call. Got radius auth for the O phone.
@@ -381,8 +403,8 @@ class CallController(object):
           expire_time = expires, no_progress_time = no_progress_expires, \
           extra_headers = parameters.get('extra_headers', None))
         if self.rtp_proxy_session and parameters.get('rtpp', True):
-            ua.on_local_sdp_change = self.rtp_proxy_session.on_caller_sdp_change
-            ua.on_remote_sdp_change = self.rtp_proxy_session.on_callee_sdp_change
+            ua.on_local_sdp_change = self.rtp_proxy_session.on_callee_sdp_change
+            ua.on_remote_sdp_change = self.rtp_proxy_session.on_caller_sdp_change
             body = body.getCopy()
             body.content += 'a=nortpproxy:yes\r\n'
             self.proxied = True
@@ -456,10 +478,13 @@ class CallController(object):
         # A re-INVITE should be sent to the left phone.
         if self.acctO:
             self.acctO.conn(ua, rtime, origin)
-        self.state = CCStateUpdatingA
-        body = self.uaO.rSDP #TODO: a get method()?
-        event = CCEventUpdate(body)
-        self.uaO.delayed_remote_sdp_update(event, body)
+        if not self.global_config.has_key('rtp_proxy_clients'):
+            self.state = CCStateUpdatingA
+            body = self.uaO.rSDP #TODO: a get method()?
+            event = CCEventUpdate(body)
+            self.uaO.delayed_remote_sdp_update(event, body)
+        else:
+            self.state = CCStateConnected
 
     def aConn(self, ua, rtime, origin):
         print 'aConn(): self.state:', self.state
@@ -475,20 +500,6 @@ class CallController(object):
         # An INVITE should be sent to the right phone.
         #TODO: move to a subroutine
         self.acctA.conn(ua, rtime, origin)
-        self.cli, self.cld = self.cld, self.cli
-        body = self.uaA.rSDP #TODO: a get method()?
-
-        self.cId = SipCallId()
-        self.caller_name = self.cli
-        auth = None
-        ev = CCEventTry((self.cId, self.cGUID, self.cli, self.cld, body, auth, self.cli), origin = self.cld)
-        self.eTry = ev
-        self.state = CCStateWaitRouteO
-        if self.global_config['auth_enable']:
-            self.auth_proc = self.global_config['radius_client'].do_auth(self.cli, self.cli, self.cld, self.cGUID, \
-                self.cId, self.remote_ip, self.rDone)
-        else:
-            self.rDone(((), 0))
 
     def aDisc(self, ua, rtime, origin, result = 0):
         print 'aDisc()'
@@ -545,6 +556,10 @@ class CallController(object):
         self.cId = SipCallId()
         self.caller_name = self.cli
         auth = None
+        if self.global_config.has_key('rtp_proxy_clients'):
+            self.rtp_proxy_session = Rtp_proxy_session(self.global_config, call_id = self.cId, \
+              notify_socket = global_config['b2bua_socket'], \
+              notify_tag = quote('r %s' % str(self.id)))
         ev = CCEventTry((self.cId, self.cGUID, self.cli, self.cld, MsgBody(), auth, self.cli), origin = self.cld)
         self.eTry = ev
         self.state = CCStateWaitRouteA
@@ -752,6 +767,7 @@ class CallMap(object):
                 if len(args) != 2:
                     clim.send('ERROR: syntax error:\n' + help + prompt)
                     return False
+                print 'received command "c', args[0], args[1] + '"'
                 guid = self.makeCall(args[0], args[1])
                 clim.send(str(guid) + '\n' + prompt)
                 return False

@@ -47,7 +47,7 @@ class MsgBody(object):
                 self.content = cself.content.getCopy()
             self.mtype = cself.mtype
         else:
-            self.content = SdpBody()
+            self.content = str(SdpBody())
             self.mtype = mtype
 
     def parse(self):
