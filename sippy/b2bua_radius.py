@@ -760,7 +760,7 @@ class CallMap(object):
                     return False
                 for cc in dlist:
                     if cc.state == CCStateConnected and cc.proxied:
-                        cc.disconnect(time() - 60)
+                        cc.disconnect(time())
                 clim.send('OK\n' + prompt)
                 return False
             if cmd == 'c':
