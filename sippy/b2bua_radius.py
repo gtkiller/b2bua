@@ -233,7 +233,7 @@ class CallController(object):
                 else:
                     code = None
                 if not code or code not in self.huntstop_scodes:
-                    self.placeOriginate(self.routes.pop(0), self.oConn)
+                    self.uaO = self.placeOriginate(self.routes.pop(0), self.oConn)
                     return
             self.uaA.recvEvent(event)
 
