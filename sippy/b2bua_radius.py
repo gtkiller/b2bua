@@ -35,6 +35,7 @@ from sippy.UA import UA
 from sippy.CCEvents import CCEventRing, CCEventConnect, CCEventDisconnect, CCEventTry, CCEventUpdate, CCEventFail
 from sippy.UasStateTrying import UasStateTrying
 from sippy.UasStateRinging import UasStateRinging
+from sippy.UaStateConnected import UaStateConnected
 from sippy.UaStateDead import UaStateDead
 from sippy.SipConf import SipConf
 from sippy.SipHeader import SipHeader
@@ -132,7 +133,8 @@ class CallController(object):
         self.username = username
 
     def recvEvent(self, event, ua):
-        print 'received event', event, 'in state', self.state.sname + ', ua == self.uaA ?', ua == self.uaA
+        who = 'uaA' if ua == self.uaA else 'uaO'
+        print who, 'received event', event, 'in state', self.state.sname
         if self.uaA:
             print 'self.uaA.state:', self.uaA.state
         if self.uaO:
@@ -215,25 +217,43 @@ class CallController(object):
                 auth = None
                 ev = CCEventTry((self.cId, self.cGUID, self.cli, self.cld, body, auth, self.cli), origin = self.cld)
                 self.eTry = ev
-                print 'self.eTry.getData():', self.eTry.getData()
                 self.state = CCStateWaitRouteO
                 if self.global_config['auth_enable']:
                     self.auth_proc = self.global_config['radius_client'].do_auth(self.cli, self.cli, self.cld, self.cGUID, \
                         self.cId, self.remote_ip, self.rDone)
                 else:
                     self.rDone(((), 0))
-            if self.state not in (CCStateARComplete, CCStateConnected, CCStateDisconnecting) or not self.uaO:
-                return
-            self.uaO.recvEvent(event)
-        else:
-            if (isinstance(event, CCEventFail) or isinstance(event, CCEventDisconnect)) and self.state == CCStateARComplete and \
-              (isinstance(self.uaA.state, UasStateTrying) or isinstance(self.uaA.state, UasStateRinging)) and self.routes:
+            if self.state == CCStateDead and (isinstance(event, CCEventFail) or (isinstance(event, CCEventDisconnect))) and self.routes:
                 if isinstance(event, CCEventFail):
                     code = event.getData()[0]
                 else:
                     code = None
                 if not code or code not in self.huntstop_scodes:
-                    self.uaO = self.placeOriginate(self.routes.pop(0), self.oConn)
+                    self.state = CCStateWaitRouteA
+                    self.uaA = self.placeAnswer(self.routes.pop(0))
+            if self.state not in (CCStateARComplete, CCStateConnected, CCStateDisconnecting) or not self.uaO:
+                return
+            self.uaO.recvEvent(event)
+        else:
+            if self.state == CCStateARComplete and isinstance(event, CCEventConnect) and not isinstance(self.uaO.state, UaStateConnected):
+                if not self.global_config.has_key('rtp_proxy_clients'):
+                    self.state = CCStateUpdatingA
+                    body = self.uaO.rSDP #TODO: a get method()?
+                    event = CCEventUpdate(body)
+                    self.uaO.delayed_remote_sdp_update(event, body)
+                else:
+                    self.state = CCStateConnected
+                return
+            elif (isinstance(event, CCEventFail) or isinstance(event, CCEventDisconnect)) and self.state == CCStateARComplete and \
+              (isinstance(self.uaA.state, UasStateTrying) or isinstance(self.uaA.state, UasStateRinging) \
+              or isinstance(self.uaA.state, UaStateConnected)) and self.routes:
+                if isinstance(event, CCEventFail):
+                    code = event.getData()[0]
+                else:
+                    code = None
+                if not code or code not in self.huntstop_scodes:
+                    cb = self.oConnA if isinstance(self.uaA.state, UaStateConnected) else self.oConn
+                    self.uaO = self.placeOriginate(self.routes.pop(0), cb)
                     return
             self.uaA.recvEvent(event)
 
@@ -353,6 +373,7 @@ class CallController(object):
                     credit_time = self.global_config['max_credit_time']
             if credit_time == 0 or expires == 0:
                 continue
+            print 'append route, cli=' + cli + ', cld=' + cld
             self.routes.append((rnum, host, cld, credit_time, expires, no_progress_expires, forward_on_fail, user, \
               passw, cli, parameters))
             #print 'Got route:', host, cld
@@ -404,6 +425,7 @@ class CallController(object):
           expire_time = expires, no_progress_time = no_progress_expires, \
           extra_headers = parameters.get('extra_headers', None))
         if self.rtp_proxy_session and parameters.get('rtpp', True):
+            print 'placeAnswer() registering on sdp change callbacks'
             ua.on_local_sdp_change = self.rtp_proxy_session.on_callee_sdp_change
             ua.on_remote_sdp_change = self.rtp_proxy_session.on_caller_sdp_change
             body = body.getCopy()
@@ -517,7 +539,7 @@ class CallController(object):
             print 'sent acct stop A'
         if self.uaO:
             self.uaO.recvEvent(CCEventDisconnect(rtime = rtime, origin = origin))
-        self.rtp_proxy_session = None
+#        self.rtp_proxy_session = None #TODO: what for?
 
     def aDead(self, ua):
         if (not self.uaO or isinstance(self.uaO.state, UaStateDead)):
@@ -937,7 +959,7 @@ if __name__ == '__main__':
     print global_config 
     global_config['sip_port'] = SipConf.my_port
 
-    if len(rtp_proxy_clients) > 0:
+    if rtp_proxy_clients:
         global_config['rtp_proxy_clients'] = []
         for Rtp_proxy_client, address in rtp_proxy_clients:
             global_config['rtp_proxy_clients'].append(Rtp_proxy_client(global_config, address))
