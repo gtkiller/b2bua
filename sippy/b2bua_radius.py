@@ -288,6 +288,7 @@ class CallController(object):
         else:
             routing = [self.global_config['static_route'].split(';')]
         rnum = 0
+        self.routes = []
         for route in routing:
             rnum += 1
             if '@' in route[0]:
