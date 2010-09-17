@@ -228,7 +228,7 @@ class Rtp_proxy_session(object):
             return
         for i in range(0, len(sdp_body.content.sections)):
             sect = sdp_body.content.sections[i]
-            if sect.m_header.transport.lower() not in ('udp', 'udptl', 'rtp/avp'):
+            if sect.m_header.transport.lower() not in ('udp', 'udptl', 'rtp/avp', 'rtp/savp'):
                 continue
             sects.append(sect)
         if len(sects) == 0:
