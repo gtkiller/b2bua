@@ -547,7 +547,8 @@ class CallController(object):
                 print 'garbadge collecting', self
             self.acctA = None
             self.acctO = None
-            self.global_config['cmap'].ccmap.remove(self)
+            if self in self.global_config['cmap'].ccmap:
+                self.global_config['cmap'].ccmap.remove(self)
 
     def oDead(self, ua):
         if ua == self.uaO and isinstance(self.uaA.state, UaStateDead):
